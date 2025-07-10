@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -ggdb3 -O0 -DDEBUG -MMD
+CFLAGS = -Wall -g -DDEBUG -MMD
 # CFLAGS = -Wall -O3 -MMD
 LFLAGS = -lvulkan -lglfw
 BUILD_DIR = bin
@@ -8,8 +8,9 @@ SHADER_DIR = src/shaders
 TARGET = vk_engine
 
 # Finds all the c files in 1 lvl or 2 lvl in side $(SRC_DIR)
-SRCS = $(wildcard $(SRC_DIR)**/*.c)
+SRCS = $(wildcard $(SRC_DIR)/*.c)
 SRCS += $(wildcard $(SRC_DIR)/*/*.c)
+SRCS += $(wildcard $(SRC_DIR)/*/*/*.c)
 SHADERS = $(wildcard $(SHADER_DIR)/shader.*)
 
 INCLUDES = $(SRCS:%.c=%.h)

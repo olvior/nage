@@ -8,6 +8,6 @@ int main()
 
     engine_run(&engine);
 
-    // engine_cleanup();
+    engine_cleanup(&engine);
 }
 

@@ -1,23 +1,15 @@
-#include "utils.h"
+#pragma once
 
-typedef struct GLFWwindow {} GLFWwindow;
-
-typedef struct {
-    GLFWwindow* window;
-    int width;
-    int height;
-    const char* title;
-} Window;
+#include "window.h"
+#include "renderer/renderer.h"
 
 typedef struct {
     Window window;
+    Renderer renderer;
 } Engine;
-
-
 
 
 void engine_initialise(Engine* engine);
 void engine_run(Engine* engine);
+void engine_cleanup(Engine* engine);
 
-
-void window_initialise(Window* window);
