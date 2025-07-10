@@ -35,10 +35,10 @@ void get_required_extensions(uint32_t* count, const char** extensions)
     const char** extensions_original = glfwGetRequiredInstanceExtensions(count);
     int count_original = *count;
     #ifdef __APPLE__
-        *count += 2;
+    *count += 2;
     #endif
     #ifdef VALIDATION_LAYERS_ENABLED
-        *count += 1;
+    *count += 1;
     #endif
 
     if (extensions == NULL)
@@ -49,25 +49,27 @@ void get_required_extensions(uint32_t* count, const char** extensions)
         extensions[i] = extensions_original[i];
 
     #ifdef __APPLE__
-        extensions[count_original] = VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME;
-        extensions[count_original + 1] = "VK_KHR_get_physical_device_properties2";
+    extensions[count_original] = VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME;
+    extensions[count_original + 1] = "VK_KHR_get_physical_device_properties2";
     #endif
 
     #ifdef VALIDATION_LAYERS_ENABLED
-        extensions[*count - 1] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
+    extensions[*count - 1] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
     #endif
+
+    printf("a, %d", *count);
 }
 
-static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
+VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT m_severity,
     VkDebugUtilsMessageTypeFlagsEXT m_type,
     const VkDebugUtilsMessengerCallbackDataEXT* p_data,
     void* p_user_data)
 {
     if (m_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-		LOG_W("validation layers - %s: %s\n", p_data->pMessageIdName, p_data->pMessage);
-	else if (m_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
-		LOG_W("validation layers - %s: %s\n", p_data->pMessageIdName, p_data->pMessage);
+        LOG_W("validation layers - %s: %s\n", p_data->pMessageIdName, p_data->pMessage);
+    else if (m_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+        LOG_W("validation layers - %s: %s\n", p_data->pMessageIdName, p_data->pMessage);
 
     return VK_FALSE;
 }
@@ -110,5 +112,4 @@ void destroy_debug_messenger(VkInstance* instance, VkDebugUtilsMessengerEXT* deb
     if (func != NULL)
         func(*instance, *debug_msgr, NULL);
 }
-
 

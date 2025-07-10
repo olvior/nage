@@ -14,7 +14,7 @@ void populate_debug_messenger_info(VkDebugUtilsMessengerCreateInfoEXT* info);
 bool validation_layers_supported(const char* layers[], int n);
 void get_required_extensions(uint32_t* count, const char** extensions);
 
-static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
+VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT m_severity,
     VkDebugUtilsMessageTypeFlagsEXT m_type,
     const VkDebugUtilsMessengerCallbackDataEXT* p_data,

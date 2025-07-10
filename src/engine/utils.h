@@ -58,5 +58,15 @@
     } while (0)
 
 
+typedef struct {
+    uint32_t graphics_family;
+    uint32_t present_family;
+} QueueFamilyIndices;
+
 void print_string_list(const char* b[], int n);
+uint32_t clamp(uint32_t a, uint32_t min, uint32_t max);
+
+QueueFamilyIndices find_queue_families(VkPhysicalDevice* gpu, VkSurfaceKHR* surface);
+bool indices_complete(QueueFamilyIndices* indeces);
+
 

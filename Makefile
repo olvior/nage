@@ -25,7 +25,7 @@ ifeq ($(UNAME_S),Darwin)
 	LFLAGS += -rpath /usr/local/lib
 endif
 
-all: $(SPV_SHADERS) $(BUILD_DIR)/$(TARGET)
+all: $(BUILD_DIR)/$(TARGET) $(SPV_SHADERS)
 
 $(BUILD_DIR)/$(TARGET): $(OBJS)
 	 $(CC) $(CFLAGS) -o $(BUILD_DIR)/$(TARGET) $(OBJS) $(LFLAGS)

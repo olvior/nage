@@ -1,24 +1,41 @@
 #include "renderer.h"
 #include "debug.h"
+#include "device.h"
+#include "swapchain.h"
 #include "../utils.h"
-
 
 const char* VALIDATION_LAYERS = {
     "VK_LAYER_KHRONOS_validation",
 };
 const int VALIDATION_LAYERS_COUNT = 1;
 
+
+int validation_layers_count()
+{
+    return VALIDATION_LAYERS_COUNT;
+}
+
+const char** validation_layers()
+{
+    return &VALIDATION_LAYERS;
+}
+
 // Main code
 void renderer_initialise(Renderer* renderer, GLFWwindow* window)
 {
     renderer_create_instance(renderer);
+    #ifdef VALIDATION_LAYERS_ENABLED
     create_debug_messenger(&renderer->instance, &renderer->debug_messenger);
+    #endif
     renderer_create_surface(renderer, window);
-    device_initialise(&renderer->device, &renderer->gpu);
+    device_initialise(renderer);
+    swapchain_initialise(renderer, window);
 }
 
 void renderer_cleanup(Renderer* renderer)
 {
+    swapchain_cleanup(renderer);
+    vkDestroyDevice(renderer->device, NULL);
     vkDestroySurfaceKHR(renderer->instance, renderer->surface, NULL);
     destroy_debug_messenger(&renderer->instance, &renderer->debug_messenger);
     vkDestroyInstance(renderer->instance, NULL);
