@@ -1,5 +1,7 @@
 #include "engine.h"
+#include <stdio.h>
 
+#include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
 
 void engine_initialise(Engine* engine)
@@ -13,6 +15,7 @@ void engine_run(Engine* engine)
     while(!glfwWindowShouldClose(engine->window.window))
     {
         glfwPollEvents();
+        renderer_draw(&engine->renderer);
     }
 }
 

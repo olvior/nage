@@ -52,7 +52,7 @@ void create_swap_chain(Renderer* renderer, GLFWwindow* window)
         .imageColorSpace = surface_format.colorSpace,
         .imageExtent = extent,
         .imageArrayLayers = 1,
-        .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 
         .preTransform = details.capabilities.currentTransform,
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
@@ -227,3 +227,36 @@ void create_image_views(Renderer* renderer)
         );
     }
 }
+
+
+void transition_image(VkCommandBuffer cmd_buf, VkDevice device, VkImage image,
+        VkImageLayout current_layout, VkImageLayout new_layout)
+{
+    VkImageAspectFlags aspect_mask = (new_layout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL)
+        ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+
+    VkImageSubresourceRange sub_image = {
+        .aspectMask = aspect_mask,
+        .levelCount = VK_REMAINING_MIP_LEVELS,
+        .layerCount = VK_REMAINING_ARRAY_LAYERS,
+    };
+
+    VkImageMemoryBarrier barrier = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .pNext = NULL,
+
+        .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
+
+        .oldLayout = current_layout,
+        .newLayout = new_layout,
+
+        .subresourceRange = sub_image,
+        .image = image,
+    };
+
+
+    vkCmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            0, 0, NULL, 0, NULL, 1, &barrier);
+}
+

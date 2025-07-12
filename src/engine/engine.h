@@ -4,8 +4,8 @@
 #include "renderer/renderer.h"
 
 typedef struct {
-    Window window;
     Renderer renderer;
+    Window window;
 } Engine;
 
 

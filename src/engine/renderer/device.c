@@ -4,18 +4,19 @@
 
 // macos just needs one extra extension :)
 #ifdef __APPLE__
-    const char* DEVICE_EXTENSIONS[] = {
+    const int DEVICE_EXTENSION_COUNT = 4;
+    const char* DEVICE_EXTENSIONS[DEVICE_EXTENSION_COUNT] = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
         "VK_KHR_portability_subset",
+        "VK_KHR_synchronization2",
     };
-    const int DEVICE_EXTENSION_COUNT = 3;
 #else
-    static const char* DEVICE_EXTENSIONS[] = {
+    const int DEVICE_EXTENSION_COUNT = 2;
+    static const char* DEVICE_EXTENSIONS[DEVICE_EXTENSION_COUNT] = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
     };
-    const int DEVICE_EXTENSION_COUNT = 2;
 #endif
 
 
@@ -62,7 +63,9 @@ void pick_gpu(Renderer* renderer)
 
     VkPhysicalDeviceProperties p;
     vkGetPhysicalDeviceProperties(renderer->gpu, &p);
-    printf("Picked: %s\n", p.deviceName);
+    printf("Picked: %s", p.deviceName);
+    uint32_t v = p.apiVersion;
+    printf(" version %d.%d.%d\n", VK_API_VERSION_MAJOR(v), VK_API_VERSION_MINOR(v), VK_API_VERSION_PATCH(v));
 }
 
 void create_device(Renderer* renderer)

@@ -17,6 +17,9 @@ typedef struct {
 void swapchain_initialise(Renderer* renderer, GLFWwindow* window);
 void swapchain_cleanup(Renderer* renderer);
 
+void transition_image(VkCommandBuffer cmd_buf, VkDevice device, VkImage image,
+        VkImageLayout current_layout, VkImageLayout new_layout);
+
 // internal
 void create_swap_chain(Renderer* renderer, GLFWwindow* window);
 void create_image_views(Renderer* renderer);

@@ -4,9 +4,9 @@ typedef struct GLFWwindow GLFWwindow;
 
 typedef struct {
     GLFWwindow* window;
+    const char* title;
     int width;
     int height;
-    const char* title;
 } Window;
 
 void window_initialise(Window* window);

@@ -10,6 +10,8 @@
 
 #define INVALID_IDX -1
 
+#define ONE_SEC 1000000000
+
 #define ANSI_DEFAULT 0
 #define ANSI_RED 31
 #define ANSI_YELLOW 33
@@ -68,5 +70,6 @@ uint32_t clamp(uint32_t a, uint32_t min, uint32_t max);
 
 QueueFamilyIndices find_queue_families(VkPhysicalDevice* gpu, VkSurfaceKHR* surface);
 bool indices_complete(QueueFamilyIndices* indeces);
+
 
 

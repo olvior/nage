@@ -3,6 +3,11 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+const int EXTRA_EXTENSIONS_LEN = 0;
+const char* EXTRA_EXTENSIONS[EXTRA_EXTENSIONS_LEN] = {
+    // "VK_KHR_synchronization2",
+};
+
 
 bool validation_layers_supported(const char* layers[], int n)
 {
@@ -33,7 +38,9 @@ bool validation_layers_supported(const char* layers[], int n)
 void get_required_extensions(uint32_t* count, const char** extensions)
 {
     const char** extensions_original = glfwGetRequiredInstanceExtensions(count);
-    int count_original = *count;
+    *count += EXTRA_EXTENSIONS_LEN;
+
+    int count_always = *count;
     #ifdef __APPLE__
     *count += 2;
     #endif
@@ -45,12 +52,15 @@ void get_required_extensions(uint32_t* count, const char** extensions)
         return;
 
 
-    for (int i = 0; i < count_original; ++i)
+    for (int i = 0; i < count_always; ++i)
         extensions[i] = extensions_original[i];
 
+    for (int i = 0; i < EXTRA_EXTENSIONS_LEN; ++i)
+        extensions[count_always - EXTRA_EXTENSIONS_LEN] = EXTRA_EXTENSIONS[i];
+
     #ifdef __APPLE__
-    extensions[count_original] = VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME;
-    extensions[count_original + 1] = "VK_KHR_get_physical_device_properties2";
+    extensions[count_always] = VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME;
+    extensions[count_always + 1] = "VK_KHR_get_physical_device_properties2";
     #endif
 
     #ifdef VALIDATION_LAYERS_ENABLED
@@ -92,7 +102,6 @@ void create_debug_messenger(VkInstance* instance, VkDebugUtilsMessengerEXT* debu
     populate_debug_messenger_info(&debug_create_info);
 
     VkResult result;
-    // weird address things
     PFN_vkCreateDebugUtilsMessengerEXT func = (PFN_vkCreateDebugUtilsMessengerEXT)
         vkGetInstanceProcAddr(*instance, "vkCreateDebugUtilsMessengerEXT");
 
