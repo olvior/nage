@@ -1,5 +1,6 @@
 CC = gcc
-CFLAGS = -Wall -g -DDEBUG -MMD
+CCP = g++
+CFLAGS = -Wall -g -DDEBUG -MMD -Ithird_party/VulkanMemoryAllocator/include
 # CFLAGS = -Wall -O3 -MMD
 LFLAGS = -lvulkan -lglfw
 BUILD_DIR = bin
@@ -7,14 +8,16 @@ SRC_DIR = src
 SHADER_DIR = src/shaders
 TARGET = vk_engine
 
-# Finds all the c files in 1 lvl or 2 lvl in side $(SRC_DIR)
+# Finds all the c files in 1, 2, and 3 lvl directories $(SRC_DIR)
 SRCS = $(wildcard $(SRC_DIR)/*.c)
 SRCS += $(wildcard $(SRC_DIR)/*/*.c)
 SRCS += $(wildcard $(SRC_DIR)/*/*/*.c)
+VMA_USAGE = $(wildcard $(SRC_DIR)/*/*/*.cpp)
 SHADERS = $(wildcard $(SHADER_DIR)/shader.*)
 
 INCLUDES = $(SRCS:%.c=%.h)
 OBJS = $(SRCS:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
+OBJS += $(VMA_USAGE:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
 DEPS = ${OBJS:%.o=%.d}
 SPV_SHADERS = $(SHADERS:$(SHADER_DIR)/shader.%=$(BUILD_DIR)/%.spv)
 
@@ -28,7 +31,7 @@ endif
 all: $(BUILD_DIR)/$(TARGET) $(SPV_SHADERS)
 
 $(BUILD_DIR)/$(TARGET): $(OBJS)
-	 $(CC) $(CFLAGS) -o $(BUILD_DIR)/$(TARGET) $(OBJS) $(LFLAGS)
+	 $(CCP) $(CFLAGS) -o $(BUILD_DIR)/$(TARGET) $(OBJS) $(LFLAGS)
 
 ifeq ($(UNAME_S),Darwin)
 	dsymutil $(BUILD_DIR)/$(TARGET)
@@ -37,6 +40,10 @@ endif
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(@D)
 	$(CC) ${CFLAGS} -c $< -o $@
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
+	@mkdir -p $(@D)
+	$(CCP) -std=c++20 ${CFLAGS} -c $< -o $@
 
 $(BUILD_DIR)/%.spv: $(SHADER_DIR)/shader.%
 	glslc $< -o $@
