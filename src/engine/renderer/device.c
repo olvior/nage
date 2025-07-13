@@ -9,6 +9,7 @@
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
         "VK_KHR_portability_subset",
+        // "VK_KHR_push_descriptor",
     };
 #else
     const int DEVICE_EXTENSION_COUNT = 2;

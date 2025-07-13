@@ -3,6 +3,7 @@
 #include "device.h"
 #include "swapchain.h"
 #include "image.h"
+#include "pipeline.h"
 #include "../utils.h"
 
 #include <math.h>
@@ -40,6 +41,8 @@ void renderer_initialise(Renderer* renderer, GLFWwindow* window)
     create_command_buffers(renderer);
     sync_initialise(renderer);
 
+    pipeline_initialise(renderer);
+
     renderer->frame_in_flight = 0;
     renderer->frame = 0;
 }
@@ -47,6 +50,8 @@ void renderer_initialise(Renderer* renderer, GLFWwindow* window)
 void renderer_cleanup(Renderer* renderer)
 {
     vkDeviceWaitIdle(renderer->device);
+
+    pipeline_cleanup(renderer);
 
     sync_cleanup(renderer);
     cleanup_command_buffers(renderer);

@@ -18,7 +18,7 @@ void engine_run(Engine* engine)
     {
         i++;
 
-        if (i >= 10) {
+        if (i >= 100) {
             double current_time = glfwGetTime();
             double delta = current_time - old_time;
             printf("100 frames took %lf ", delta);

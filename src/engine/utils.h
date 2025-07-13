@@ -65,6 +65,13 @@ typedef struct {
     uint32_t present_family;
 } QueueFamilyIndices;
 
+typedef struct {
+    long size;
+    char* buf;
+} File;
+
+File read_file(char path[]);
+
 void print_string_list(const char* b[], int n);
 uint32_t clamp(uint32_t a, uint32_t min, uint32_t max);
 

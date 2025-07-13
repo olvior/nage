@@ -36,11 +36,16 @@ typedef struct {
     VkPhysicalDevice gpu;
     VmaAllocator allocator;
 
+    VkDescriptorPool descriptor_pool;
+
     Swapchain swapchain;
     VkQueue graphics_queue;
 
     Image draw_image;
     VkExtent2D draw_extent;
+    VkDescriptorSet draw_image_desc_set;
+    VkDescriptorSetLayout draw_image_desc_layout;
+
 
     VkCommandPool command_pools[FRAMES_IN_FLIGHT];
     VkCommandBuffer command_buffers[FRAMES_IN_FLIGHT];

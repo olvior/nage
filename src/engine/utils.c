@@ -1,5 +1,32 @@
 #include "utils.h"
 
+// please free after :)
+File read_file(char path[])
+{
+    FILE* fp = fopen(path, "rb");
+
+    if (fp == NULL)
+    {
+        printf("Could not open file %s\n", path);
+        exit(-1);
+    }
+
+    fseek(fp, 0, SEEK_END);
+    long size = ftell(fp);
+    rewind(fp);
+
+    char* buf = malloc(size);
+
+    fread(buf, size, 1, fp);
+
+    File f = {
+        size = size,
+        buf = buf,
+    };
+
+    return f;
+}
+
 void print_string_list(const char* b[], int n)
 {
     for (int i = 0; i < n; ++i)
