@@ -2,10 +2,11 @@
 #include "debug.h"
 #include "device.h"
 #include "swapchain.h"
-#include "sync.h"
+#include "image.h"
 #include "../utils.h"
 
 #include <math.h>
+#include <vk_mem_alloc.h>
 
 const int VALIDATION_LAYERS_COUNT = 1;
 const char* VALIDATION_LAYERS[VALIDATION_LAYERS_COUNT] = {
@@ -32,12 +33,15 @@ void renderer_initialise(Renderer* renderer, GLFWwindow* window)
     #endif
     renderer_create_surface(renderer, window);
     device_initialise(renderer);
+
+    vma_allocator_initialise(renderer);
+
     swapchain_initialise(renderer, window);
     create_command_buffers(renderer);
     sync_initialise(renderer);
 
-    renderer->current_frame = 0;
-    renderer->total_frames = 0;
+    renderer->frame_in_flight = 0;
+    renderer->frame = 0;
 }
 
 void renderer_cleanup(Renderer* renderer)
@@ -47,6 +51,7 @@ void renderer_cleanup(Renderer* renderer)
     sync_cleanup(renderer);
     cleanup_command_buffers(renderer);
     swapchain_cleanup(renderer);
+    vmaDestroyAllocator(renderer->allocator);
     vkDestroyDevice(renderer->device, NULL);
     vkDestroySurfaceKHR(renderer->instance, renderer->surface, NULL);
     destroy_debug_messenger(&renderer->instance, &renderer->debug_messenger);
@@ -55,39 +60,35 @@ void renderer_cleanup(Renderer* renderer)
 
 void renderer_draw(Renderer* renderer)
 {
-    int frame = renderer->current_frame;
+    int frame = renderer->frame_in_flight;
 
     // first we wait
-    CHECK_VK_FATAL(
-            vkWaitForFences(renderer->device, 1, &renderer->fences[frame], true, ONE_SEC)
-    );
+    VK_CHECK(vkWaitForFences(renderer->device, 1, &renderer->fences[frame], true, ONE_SEC));
 
-    CHECK_VK_FATAL(
-            vkResetFences(renderer->device, 1, &renderer->fences[frame])
-    );
+    VK_CHECK(vkResetFences(renderer->device, 1, &renderer->fences[frame]));
 
     uint32_t image_index;
-    CHECK_VK_FATAL(
+    VK_CHECK(
             vkAcquireNextImageKHR(renderer->device, renderer->swapchain.swapchain, ONE_SEC,
                 renderer->semaphores_swapchain[frame], NULL, &image_index)
     );
 
     // init the command buffer
     VkCommandBuffer cmd_buf = renderer->command_buffers[frame];
-    CHECK_VK_FATAL(vkResetCommandBuffer(cmd_buf, 0));
+    VK_CHECK(vkResetCommandBuffer(cmd_buf, 0));
 
     VkCommandBufferBeginInfo begin_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
     };
-    CHECK_VK_FATAL(vkBeginCommandBuffer(cmd_buf, &begin_info));
+    VK_CHECK(vkBeginCommandBuffer(cmd_buf, &begin_info));
 
     // printf("%d, a\n", image_index);
-    transition_image(cmd_buf, renderer->device, renderer->swapchain.images[image_index],
+    transition_image(cmd_buf, renderer->device, renderer->draw_image.image,
             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
 
-    float flash = fabsf(sinf(renderer->total_frames / 120.0f));
+    float flash = fabsf(sinf(renderer->frame / 20.0f));
     VkClearColorValue clear_value = { {0.0f, 0.0f, flash, 1.0f} };
 
     VkImageSubresourceRange clear_range = {
@@ -97,20 +98,27 @@ void renderer_draw(Renderer* renderer)
     };
 
     // clear image
-    vkCmdClearColorImage(cmd_buf, renderer->swapchain.images[image_index],
+    vkCmdClearColorImage(cmd_buf, renderer->draw_image.image,
             VK_IMAGE_LAYOUT_GENERAL, &clear_value, 1, &clear_range);
 
-    // make it presentable
+    transition_image(cmd_buf, renderer->device, renderer->draw_image.image,
+            VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     transition_image(cmd_buf, renderer->device, renderer->swapchain.images[image_index],
-            VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-    CHECK_VK_FATAL(vkEndCommandBuffer(cmd_buf));
+    VkExtent2D draw_extent = {renderer->draw_image.extent.width, renderer->draw_image.extent.height};
+    copy_image(cmd_buf, renderer->draw_image.image, renderer->swapchain.images[image_index],
+            draw_extent, renderer->swapchain.extent);
+
+    transition_image(cmd_buf, renderer->device, renderer->swapchain.images[image_index],
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
+
+    VK_CHECK(vkEndCommandBuffer(cmd_buf));
 
     VkSubmitInfo submit_info = get_submit_info(renderer);
 
-    CHECK_VK_FATAL(
-        vkQueueSubmit(renderer->graphics_queue, 1, &submit_info, renderer->fences[frame])
-    );
+    VK_CHECK(vkQueueSubmit(renderer->graphics_queue, 1, &submit_info, renderer->fences[frame]));
 
     // now we need to present
 
@@ -126,9 +134,13 @@ void renderer_draw(Renderer* renderer)
         .pImageIndices = &image_index,
     };
 
-    CHECK_VK_FATAL(vkQueuePresentKHR(renderer->graphics_queue, &present_info));
+    VK_CHECK(vkQueuePresentKHR(renderer->graphics_queue, &present_info));
 
     renderer_inc_frame(renderer);
+}
+
+void draw_background(Renderer* renderer)
+{
 }
 
 void renderer_create_instance(Renderer* renderer)
@@ -143,7 +155,7 @@ void renderer_create_instance(Renderer* renderer)
         .pApplicationName = "Test app",
         .pEngineName = "Engine name here",
         .engineVersion = VK_MAKE_VERSION(0, 1, 0),
-        .apiVersion = VK_API_VERSION_1_3,
+        .apiVersion = VK_API_VERSION_1_2,
     };
 
     uint32_t extension_count;
@@ -176,16 +188,27 @@ void renderer_create_instance(Renderer* renderer)
     };
 
     VkResult result = vkCreateInstance(&instance_create_info, NULL, &renderer->instance);
-    CHECK_VK_FATAL(result);
+    VK_CHECK(result);
 
     LOG_W("oh no\n");
 }
 
+void vma_allocator_initialise(Renderer* renderer)
+{
+    VmaAllocatorCreateInfo allocator_info = {
+        .physicalDevice = renderer->gpu,
+        .device = renderer->device,
+        .instance = renderer->instance,
+        // .flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
+        // tutorials wants this but probably not needed
+    };
+
+    vmaCreateAllocator(&allocator_info, &renderer->allocator);
+}
+
 void renderer_create_surface(Renderer* renderer, GLFWwindow* window)
 {
-    CHECK_VK_FATAL(
-            glfwCreateWindowSurface(renderer->instance, window, NULL, &renderer->surface)
-    );
+    VK_CHECK(glfwCreateWindowSurface(renderer->instance, window, NULL, &renderer->surface));
 }
 
 void create_command_buffers(Renderer* renderer)
@@ -200,7 +223,7 @@ void create_command_buffers(Renderer* renderer)
 
     for (int i = 0; i < FRAMES_IN_FLIGHT; ++i)
     {
-        CHECK_VK_FATAL(
+        VK_CHECK(
                 vkCreateCommandPool(
                     renderer->device,
                     &command_pool_info,
@@ -216,7 +239,7 @@ void create_command_buffers(Renderer* renderer)
             .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
         };
 
-        CHECK_VK_FATAL(
+        VK_CHECK(
                 vkAllocateCommandBuffers(
                     renderer->device,
                     &cmd_alloc_info,
@@ -234,10 +257,55 @@ void cleanup_command_buffers(Renderer* renderer)
     }
 }
 
+void sync_initialise(Renderer* renderer)
+{
+    VkFenceCreateInfo fence_info = {
+        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+        .flags = VK_FENCE_CREATE_SIGNALED_BIT
+    };
+
+    VkSemaphoreCreateInfo semaphore_info = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
+    };
+
+    for (int i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        VK_CHECK(vkCreateFence(renderer->device, &fence_info, NULL, &renderer->fences[i]));
+
+        VK_CHECK(
+            vkCreateSemaphore(
+                renderer->device,
+                &semaphore_info,
+                NULL,
+                &renderer->semaphores_render[i]
+            )
+        );
+
+        VK_CHECK(
+            vkCreateSemaphore(
+                renderer->device,
+                &semaphore_info,
+                NULL,
+                &renderer->semaphores_swapchain[i]
+            )
+        );
+    }
+}
+
+void sync_cleanup(Renderer* renderer)
+{
+    for (int i = 0; i < FRAMES_IN_FLIGHT; ++i)
+    {
+        vkDestroySemaphore(renderer->device, renderer->semaphores_render[i], NULL);
+        vkDestroySemaphore(renderer->device, renderer->semaphores_swapchain[i], NULL);
+        vkDestroyFence(renderer->device, renderer->fences[i], NULL);
+    }
+}
+
+
 VkSubmitInfo get_submit_info(Renderer* renderer)
 {
-    VkSemaphore* wait_semaphore = &renderer->semaphores_swapchain[renderer->current_frame];
-    VkSemaphore* signal_semaphore = &renderer->semaphores_render[renderer->current_frame];
+    VkSemaphore* wait_semaphore = &renderer->semaphores_swapchain[renderer->frame_in_flight];
+    VkSemaphore* signal_semaphore = &renderer->semaphores_render[renderer->frame_in_flight];
     VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 
 
@@ -253,7 +321,7 @@ VkSubmitInfo get_submit_info(Renderer* renderer)
         .pSignalSemaphores = signal_semaphore,
 
         .commandBufferCount = 1,
-        .pCommandBuffers = &renderer->command_buffers[renderer->current_frame],
+        .pCommandBuffers = &renderer->command_buffers[renderer->frame_in_flight],
     };
 
 
@@ -262,9 +330,10 @@ VkSubmitInfo get_submit_info(Renderer* renderer)
 
 void renderer_inc_frame(Renderer* renderer)
 {
-    renderer->current_frame += 1;
-    if (renderer->current_frame >= FRAMES_IN_FLIGHT)
-        renderer->current_frame = 0;
+    renderer->frame_in_flight += 1;
+    if (renderer->frame_in_flight >= FRAMES_IN_FLIGHT)
+        renderer->frame_in_flight = 0;
 
-    renderer->total_frames += 1;
+    renderer->frame += 1;
 }
+

@@ -17,7 +17,7 @@
 #define ANSI_YELLOW 33
 
 // interesting set of macros
-#define CHECK_VK_FATAL(x)                             \
+#define VK_CHECK(x)                             \
     do {                                              \
         if (x)                                        \
             FATAL("VULKAN %s\n", string_VkResult(x)); \

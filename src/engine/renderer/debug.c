@@ -5,7 +5,6 @@
 
 const int EXTRA_EXTENSIONS_LEN = 0;
 const char* EXTRA_EXTENSIONS[EXTRA_EXTENSIONS_LEN] = {
-    // "VK_KHR_synchronization2",
 };
 
 
@@ -110,7 +109,7 @@ void create_debug_messenger(VkInstance* instance, VkDebugUtilsMessengerEXT* debu
     else
         result = VK_ERROR_EXTENSION_NOT_PRESENT;
 
-    CHECK_VK_FATAL(result);
+    VK_CHECK(result);
 }
 
 void destroy_debug_messenger(VkInstance* instance, VkDebugUtilsMessengerEXT* debug_msgr)

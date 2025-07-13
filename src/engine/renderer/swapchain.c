@@ -1,15 +1,22 @@
 #include "swapchain.h"
+#include "image.h"
+#include <vk_mem_alloc.h>
 #include "../utils.h"
 
 void swapchain_initialise(Renderer* renderer, GLFWwindow* window)
 {
     create_swap_chain(renderer, window);
     create_image_views(renderer);
+    create_drawing_image(renderer);
 }
 
 void swapchain_cleanup(Renderer* renderer)
 {
     Swapchain* swapchain = &renderer->swapchain;
+
+    vkDestroyImageView(renderer->device, renderer->draw_image.view, NULL);
+    vmaDestroyImage(renderer->allocator, renderer->draw_image.image, renderer->draw_image.allocation);
+
 
     for (int i = 0; i < swapchain->image_count; ++i)
         vkDestroyImageView(renderer->device, swapchain->image_views[i], NULL);
@@ -78,7 +85,7 @@ void create_swap_chain(Renderer* renderer, GLFWwindow* window)
         swapchain_create_info.pQueueFamilyIndices = NULL;
     }
 
-    CHECK_VK_FATAL(
+    VK_CHECK(
             vkCreateSwapchainKHR(
                 renderer->device,
                 &swapchain_create_info,
@@ -104,6 +111,7 @@ void create_swap_chain(Renderer* renderer, GLFWwindow* window)
     swapchain->image_format = surface_format.format;
     swapchain->extent = extent;
 }
+
 
 void query_swap_chain_support(Renderer* renderer, SwapChainSupportDetails* details)
 {
@@ -217,7 +225,7 @@ void create_image_views(Renderer* renderer)
             }
         };
 
-        CHECK_VK_FATAL(
+        VK_CHECK(
                 vkCreateImageView(
                     renderer->device,
                     &image_view_create_info,
@@ -228,35 +236,40 @@ void create_image_views(Renderer* renderer)
     }
 }
 
-
-void transition_image(VkCommandBuffer cmd_buf, VkDevice device, VkImage image,
-        VkImageLayout current_layout, VkImageLayout new_layout)
+void create_drawing_image(Renderer* renderer)
 {
-    VkImageAspectFlags aspect_mask = (new_layout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL)
-        ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+    Swapchain* sc = &renderer->swapchain;
+    Image* draw_image = &renderer->draw_image;
 
-    VkImageSubresourceRange sub_image = {
-        .aspectMask = aspect_mask,
-        .levelCount = VK_REMAINING_MIP_LEVELS,
-        .layerCount = VK_REMAINING_ARRAY_LAYERS,
+    VkExtent3D extent = {
+        .width = sc->extent.width,
+        .height = sc->extent.height,
+        .depth = 1,
     };
 
-    VkImageMemoryBarrier barrier = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .pNext = NULL,
+    VkFormat format = VK_FORMAT_R16G16B16A16_SFLOAT;
 
-        .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
+    draw_image->format = format;
+    draw_image->extent = extent;
 
-        .oldLayout = current_layout,
-        .newLayout = new_layout,
+    VkImageUsageFlags usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-        .subresourceRange = sub_image,
-        .image = image,
+    VkImageCreateInfo image_create_info = get_image_create_info(format, usage, extent);
+
+    VmaAllocationCreateInfo image_alloc_info = {
+        .usage = VMA_MEMORY_USAGE_GPU_ONLY,
+        .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     };
 
+    vmaCreateImage(renderer->allocator, &image_create_info, &image_alloc_info,
+            &draw_image->image, &draw_image->allocation, NULL);
 
-    vkCmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-            0, 0, NULL, 0, NULL, 1, &barrier);
+    VkImageViewCreateInfo image_view_info = get_image_view_create_info(format,
+            draw_image->image, VK_IMAGE_ASPECT_COLOR_BIT);
+
+    VK_CHECK(vkCreateImageView(renderer->device, &image_view_info, NULL, &draw_image->view));
+
 }
 

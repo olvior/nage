@@ -12,8 +12,21 @@ void engine_initialise(Engine* engine)
 
 void engine_run(Engine* engine)
 {
+    double old_time = glfwGetTime();
+    int i = 0;
     while(!glfwWindowShouldClose(engine->window.window))
     {
+        i++;
+
+        if (i >= 10) {
+            double current_time = glfwGetTime();
+            double delta = current_time - old_time;
+            printf("100 frames took %lf ", delta);
+            printf("(%.1lf fps)\n", 100 / delta);
+            old_time = glfwGetTime();
+            i = 0;
+        }
+
         glfwPollEvents();
         renderer_draw(&engine->renderer);
     }
