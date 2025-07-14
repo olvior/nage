@@ -4,12 +4,17 @@
 
 // macos just needs one extra extension :)
 #ifdef __APPLE__
-    const int DEVICE_EXTENSION_COUNT = 3;
+    const int DEVICE_EXTENSION_COUNT = 8;
     const char* DEVICE_EXTENSIONS[DEVICE_EXTENSION_COUNT] = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
         "VK_KHR_portability_subset",
         // "VK_KHR_push_descriptor",
+        "VK_KHR_dynamic_rendering",
+        "VK_KHR_depth_stencil_resolve",
+        "VK_KHR_create_renderpass2",
+        "VK_KHR_multiview",
+        "VK_KHR_maintenance2",
     };
 #else
     const int DEVICE_EXTENSION_COUNT = 2;
@@ -83,8 +88,15 @@ void create_device(Renderer* renderer)
 
     VkPhysicalDeviceFeatures device_features = {0};
 
+    // enable the feature
+    VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_feature = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR,
+        .dynamicRendering = VK_TRUE,
+    };
+
     VkDeviceCreateInfo device_create_info = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        .pNext = &dynamic_rendering_feature,
         .pQueueCreateInfos = &queue_create_info,
         .queueCreateInfoCount = 1,
 

@@ -4,10 +4,17 @@
 #include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
 
+#include <dcimgui.h>
+#include <dcimgui_impl_vulkan.h>
+#include <dcimgui_impl_glfw.h>
+
+#include "dearimgui.h"
+
 void engine_initialise(Engine* engine)
 {
     window_initialise(&engine->window);
     renderer_initialise(&engine->renderer, engine->window.window);
+    imgui_initialise(&engine->renderer, engine->window.window, &engine->io);
 }
 
 void engine_run(Engine* engine)
@@ -28,6 +35,9 @@ void engine_run(Engine* engine)
         }
 
         glfwPollEvents();
+
+        imgui_frame(engine->io);
+
         renderer_draw(&engine->renderer);
     }
 }
@@ -35,6 +45,9 @@ void engine_run(Engine* engine)
 void engine_cleanup(Engine* engine)
 {
     window_cleanup(&engine->window);
+
+    vkDeviceWaitIdle(engine->renderer.device);
+    imgui_cleanup(&engine->renderer);
     renderer_cleanup(&engine->renderer);
 }
 

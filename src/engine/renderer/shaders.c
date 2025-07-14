@@ -28,13 +28,3 @@ VkShaderModule create_shader(VkDevice device, char file_path[])
     return shader;
 }
 
-void populate_pipeline_shader_info(VkPipelineShaderStageCreateInfo* info,
-        VkShaderStageFlagBits stage, VkShaderModule* module)
-{
-    info->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    info->stage = stage;
-    info->module = *module;
-    info->pName = "main";
-}
-
-

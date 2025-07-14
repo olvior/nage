@@ -1,7 +1,8 @@
 CC = gcc
 CCP = g++
-CFLAGS = -Wall -g -DDEBUG -MMD -Ithird_party/VulkanMemoryAllocator/include
+CFLAGS = -Wall -g -DDEBUG -MMD
 # CFLAGS = -Wall -O3 -MMD
+CFLAGS += -Ithird_party/VulkanMemoryAllocator/include -Ithird_party/imgui
 LFLAGS = -lvulkan -lglfw
 BUILD_DIR = bin
 SRC_DIR = src
@@ -21,6 +22,9 @@ OBJS += $(VMA_USAGE:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
 DEPS = ${OBJS:%.o=%.d}
 SPV_SHADERS = $(SHADERS:$(SHADER_DIR)/shader.%=$(BUILD_DIR)/%.spv)
 
+IMGUI_DIR = third_party/imgui
+IMGUI_SRCS = $(wildcard $(IMGUI_DIR)/*.cpp)
+OBJS += $(IMGUI_SRCS:$(IMGUI_DIR)/%.cpp=$(BUILD_DIR)/$(IMGUI_DIR)/%.o)
 
 # MACOS wants a -rpath
 UNAME_S := $(shell uname -s)
@@ -42,6 +46,10 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) ${CFLAGS} -c $< -o $@
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
+	@mkdir -p $(@D)
+	$(CCP) -std=c++20 ${CFLAGS} -c $< -o $@
+
+$(BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(@D)
 	$(CCP) -std=c++20 ${CFLAGS} -c $< -o $@
 
@@ -68,5 +76,6 @@ debug:
 	@echo OBJS is: $(OBJS)
 	@echo DEPS is: $(DEPS)
 	@echo SPV_SHADERS is: $(SPV_SHADERS)
+	@echo IMGUI_SRCS is: $(IMGUI_SRCS)
 
 

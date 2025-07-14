@@ -2,10 +2,12 @@
 
 #include "window.h"
 #include "renderer/renderer.h"
+#include <dcimgui.h>
 
 typedef struct {
     Renderer renderer;
     Window window;
+    ImGuiIO* io;
 } Engine;
 
 

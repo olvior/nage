@@ -4,6 +4,7 @@
 #include "swapchain.h"
 #include "image.h"
 #include "pipeline.h"
+#include "../dearimgui.h"
 #include "../utils.h"
 
 #include <math.h>
@@ -49,8 +50,6 @@ void renderer_initialise(Renderer* renderer, GLFWwindow* window)
 
 void renderer_cleanup(Renderer* renderer)
 {
-    vkDeviceWaitIdle(renderer->device);
-
     pipeline_cleanup(renderer);
 
     sync_cleanup(renderer);
@@ -88,23 +87,19 @@ void renderer_draw(Renderer* renderer)
     };
     VK_CHECK(vkBeginCommandBuffer(cmd_buf, &begin_info));
 
-    // printf("%d, a\n", image_index);
     transition_image(cmd_buf, renderer->device, renderer->draw_image.image,
             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
 
-    float flash = fabsf(sinf(renderer->frame / 20.0f));
-    VkClearColorValue clear_value = { {0.0f, 0.0f, flash, 1.0f} };
+    vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_COMPUTE, renderer->pipeline);
 
-    VkImageSubresourceRange clear_range = {
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        .levelCount = VK_REMAINING_MIP_LEVELS,
-        .layerCount = VK_REMAINING_ARRAY_LAYERS,
-    };
+    vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_COMPUTE, renderer->pipeline_layout,
+            0, 1, &renderer->draw_image_desc_set, 0, NULL);
 
-    // clear image
-    vkCmdClearColorImage(cmd_buf, renderer->draw_image.image,
-            VK_IMAGE_LAYOUT_GENERAL, &clear_value, 1, &clear_range);
+    vkCmdDispatch(cmd_buf, ceilf(renderer->swapchain.extent.width / 16.0),
+            ceilf(renderer->swapchain.extent.height / 16.0), 1);
+
+
 
     transition_image(cmd_buf, renderer->device, renderer->draw_image.image,
             VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -116,8 +111,12 @@ void renderer_draw(Renderer* renderer)
             draw_extent, renderer->swapchain.extent);
 
     transition_image(cmd_buf, renderer->device, renderer->swapchain.images[image_index],
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
+    imgui_draw(renderer, cmd_buf, renderer->swapchain.image_views[image_index]);
+
+    transition_image(cmd_buf, renderer->device, renderer->swapchain.images[image_index],
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     VK_CHECK(vkEndCommandBuffer(cmd_buf));
 
@@ -165,6 +164,7 @@ void renderer_create_instance(Renderer* renderer)
 
     uint32_t extension_count;
     get_required_extensions(&extension_count, NULL);
+
     const char* extensions[extension_count];
     get_required_extensions(&extension_count, extensions);
 
@@ -252,6 +252,17 @@ void create_command_buffers(Renderer* renderer)
                 )
         );
     }
+
+    VK_CHECK(vkCreateCommandPool(renderer->device, &command_pool_info, NULL, &renderer->imm_cmd_pool));
+
+    VkCommandBufferAllocateInfo cmd_alloc_info = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .commandPool = renderer->imm_cmd_pool,
+        .commandBufferCount = 1,
+        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+    };
+
+    VK_CHECK(vkAllocateCommandBuffers(renderer->device, &cmd_alloc_info, &renderer->imm_cmd_buf));
 }
 
 void cleanup_command_buffers(Renderer* renderer)
@@ -260,6 +271,8 @@ void cleanup_command_buffers(Renderer* renderer)
     {
         vkDestroyCommandPool(renderer->device, renderer->command_pools[i], NULL);
     }
+
+    vkDestroyCommandPool(renderer->device, renderer->imm_cmd_pool, NULL);
 }
 
 void sync_initialise(Renderer* renderer)
@@ -294,6 +307,10 @@ void sync_initialise(Renderer* renderer)
             )
         );
     }
+
+
+    // immediate mode
+    VK_CHECK(vkCreateFence(renderer->device, &fence_info, NULL, &renderer->imm_fence));
 }
 
 void sync_cleanup(Renderer* renderer)
@@ -304,6 +321,8 @@ void sync_cleanup(Renderer* renderer)
         vkDestroySemaphore(renderer->device, renderer->semaphores_swapchain[i], NULL);
         vkDestroyFence(renderer->device, renderer->fences[i], NULL);
     }
+
+    vkDestroyFence(renderer->device, renderer->imm_fence, NULL);
 }
 
 
@@ -331,6 +350,36 @@ VkSubmitInfo get_submit_info(Renderer* renderer)
 
 
     return submit_info;
+}
+
+void immediate_begin(Renderer* renderer)
+{
+    VK_CHECK(vkResetFences(renderer->device, 1, &renderer->imm_fence));
+    VK_CHECK(vkResetCommandBuffer(renderer->imm_cmd_buf, 0));
+
+    VkCommandBufferBeginInfo cmd_begin_info = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+    };
+
+    VK_CHECK(vkBeginCommandBuffer(renderer->imm_cmd_buf, &cmd_begin_info));
+}
+
+void immediate_end(Renderer* renderer)
+{
+    VK_CHECK(vkEndCommandBuffer(renderer->imm_cmd_buf));
+
+    VkPipelineStageFlags waits[] = {VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT};
+
+    VkSubmitInfo submit_info = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .pWaitDstStageMask = waits,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &renderer->imm_cmd_buf,
+    };
+
+    VK_CHECK(vkQueueSubmit(renderer->graphics_queue, 1, &submit_info, renderer->imm_fence));
+    VK_CHECK(vkWaitForFences(renderer->device, 1, &renderer->imm_fence, true, ONE_SEC));
 }
 
 void renderer_inc_frame(Renderer* renderer)

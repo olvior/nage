@@ -1,4 +1,5 @@
 #include "pipeline.h"
+#include "shaders.h"
 #include "../utils.h"
 
 #include <vulkan/vulkan.h>
@@ -7,6 +8,17 @@
 void pipeline_initialise(Renderer* renderer)
 {
     descriptors_initialise(renderer);
+    create_pipeline_layout(renderer);
+    create_pipeline(renderer);
+}
+
+void pipeline_cleanup(Renderer* renderer)
+{
+    vkDestroyPipeline(renderer->device, renderer->pipeline, NULL);
+    vkDestroyPipelineLayout(renderer->device, renderer->pipeline_layout, NULL);
+
+    destroy_pool(renderer->descriptor_pool, renderer->device);
+    vkDestroyDescriptorSetLayout(renderer->device, renderer->draw_image_desc_layout, NULL);
 }
 
 void descriptors_initialise(Renderer* renderer)
@@ -49,12 +61,6 @@ void descriptors_initialise(Renderer* renderer)
     };
 
     vkUpdateDescriptorSets(renderer->device, 1, &draw_image_write, 0, NULL);
-}
-
-void pipeline_cleanup(Renderer* renderer)
-{
-    destroy_pool(renderer->descriptor_pool, renderer->device);
-    vkDestroyDescriptorSetLayout(renderer->device, renderer->draw_image_desc_layout, NULL);
 }
 
 VkDescriptorSetLayout create_descriptor_set_layout(VkDescriptorSetLayoutBinding* bindings,
@@ -130,5 +136,45 @@ VkDescriptorSet allocate_descriptor_set(VkDescriptorPool pool, VkDevice device,
     VK_CHECK(vkAllocateDescriptorSets(device, &alloc_info, &descriptor_set));
 
     return descriptor_set;
+}
+
+void create_pipeline_layout(Renderer* renderer)
+{
+    VkPipelineLayoutCreateInfo pipeline_layout = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .pNext = NULL,
+        .pSetLayouts = &renderer->draw_image_desc_layout,
+        .setLayoutCount = 1,
+    };
+
+    VK_CHECK(vkCreatePipelineLayout(renderer->device, &pipeline_layout, NULL,
+                &renderer->pipeline_layout));
+}
+
+void create_pipeline(Renderer* renderer)
+{
+    VkShaderModule compute_shader = create_shader(renderer->device, "comp.spv");
+
+    VkPipelineShaderStageCreateInfo stage_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .pNext = NULL,
+
+        .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+        .module = compute_shader,
+        .pName = "main",
+    };
+
+    VkComputePipelineCreateInfo pipeline_create_info = {
+        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+        .pNext = NULL,
+
+        .layout = renderer->pipeline_layout,
+        .stage = stage_info,
+    };
+
+    VK_CHECK(vkCreateComputePipelines(renderer->device, VK_NULL_HANDLE, 1, &pipeline_create_info,
+                NULL, &renderer->pipeline));
+
+    vkDestroyShaderModule(renderer->device, compute_shader, NULL);
 }
 

@@ -37,6 +37,8 @@ typedef struct {
     VmaAllocator allocator;
 
     VkDescriptorPool descriptor_pool;
+    VkPipeline pipeline;
+    VkPipelineLayout pipeline_layout;
 
     Swapchain swapchain;
     VkQueue graphics_queue;
@@ -53,6 +55,11 @@ typedef struct {
     VkSemaphore semaphores_swapchain[FRAMES_IN_FLIGHT];
     VkSemaphore semaphores_render[FRAMES_IN_FLIGHT];
     VkFence fences[FRAMES_IN_FLIGHT];
+
+    VkCommandPool imm_cmd_pool;
+    VkCommandBuffer imm_cmd_buf;
+    VkFence imm_fence;
+    VkDescriptorPool imgui_pool;
 
     int frame_in_flight;
     int frame;

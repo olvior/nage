@@ -20,4 +20,6 @@ VkDescriptorSet allocate_descriptor_set(VkDescriptorPool pool, VkDevice device,
 void clear_descriptor_pool(VkDescriptorPool pool, VkDevice device);
 void destroy_pool(VkDescriptorPool pool, VkDevice device);
 void descriptors_initialise(Renderer* renderer);
+void create_pipeline_layout(Renderer* renderer);
+void create_pipeline(Renderer* renderer);
 

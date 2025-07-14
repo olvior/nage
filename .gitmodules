@@ -1,3 +1,10 @@
 [submodule "third_party/VulkanMemoryAllocator"]
 	path = third_party/VulkanMemoryAllocator
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
+[submodule "third_party/imgui"]
+	path = third_party/imgui
+	url = https://github.com/ocornut/imgui
+	branch = docking
+[submodule "third_party/dear_bindings"]
+	path = third_party/dear_bindings
+	url = https://github.com/dearimgui/dear_bindings

@@ -5,6 +5,7 @@
 
 const int EXTRA_EXTENSIONS_LEN = 0;
 const char* EXTRA_EXTENSIONS[EXTRA_EXTENSIONS_LEN] = {
+        // "VK_KHR_get_physical_device_properties2",
 };
 
 
@@ -55,7 +56,7 @@ void get_required_extensions(uint32_t* count, const char** extensions)
         extensions[i] = extensions_original[i];
 
     for (int i = 0; i < EXTRA_EXTENSIONS_LEN; ++i)
-        extensions[count_always - EXTRA_EXTENSIONS_LEN] = EXTRA_EXTENSIONS[i];
+        extensions[count_always - EXTRA_EXTENSIONS_LEN + i] = EXTRA_EXTENSIONS[i];
 
     #ifdef __APPLE__
     extensions[count_always] = VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME;
@@ -66,7 +67,7 @@ void get_required_extensions(uint32_t* count, const char** extensions)
     extensions[*count - 1] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
     #endif
 
-    printf("a, %d", *count);
+    printf("extensions needed = %d\n", *count);
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
