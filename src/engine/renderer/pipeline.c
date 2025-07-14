@@ -10,6 +10,9 @@ void pipeline_initialise(Renderer* renderer)
     descriptors_initialise(renderer);
     create_pipeline_layout(renderer);
     create_pipeline(renderer);
+
+    PushConstants a = {{100}};
+    renderer->push_constants = a;
 }
 
 void pipeline_cleanup(Renderer* renderer)
@@ -140,11 +143,20 @@ VkDescriptorSet allocate_descriptor_set(VkDescriptorPool pool, VkDevice device,
 
 void create_pipeline_layout(Renderer* renderer)
 {
+    VkPushConstantRange push_constant = {
+        .offset = 0,
+        .size = sizeof(PushConstants),
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+    };
+
     VkPipelineLayoutCreateInfo pipeline_layout = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .pNext = NULL,
         .pSetLayouts = &renderer->draw_image_desc_layout,
         .setLayoutCount = 1,
+
+        .pushConstantRangeCount = 1,
+        .pPushConstantRanges = &push_constant,
     };
 
     VK_CHECK(vkCreatePipelineLayout(renderer->device, &pipeline_layout, NULL,

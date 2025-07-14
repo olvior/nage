@@ -36,7 +36,9 @@ void engine_run(Engine* engine)
 
         glfwPollEvents();
 
-        imgui_frame(engine->io);
+        process_inputs(engine);
+
+        imgui_frame(engine->io, &engine->renderer);
 
         renderer_draw(&engine->renderer);
     }
@@ -51,3 +53,26 @@ void engine_cleanup(Engine* engine)
     renderer_cleanup(&engine->renderer);
 }
 
+void process_inputs(Engine* engine)
+{
+    PushConstants* pc = &engine->renderer.push_constants;
+    float zoom = powf(2, pc->data2[0]);
+    if (glfwGetKey(engine->window.window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+        pc->data2[1] -= 0.1 / zoom;
+    }
+    if (glfwGetKey(engine->window.window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+        pc->data2[1] += 0.1 / zoom;
+    }
+    if (glfwGetKey(engine->window.window, GLFW_KEY_UP) == GLFW_PRESS) {
+        pc->data2[2] -= 0.1 / zoom;
+    }
+    if (glfwGetKey(engine->window.window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+        pc->data2[2] += 0.1 / zoom;
+    }
+    if (glfwGetKey(engine->window.window, GLFW_KEY_PERIOD) == GLFW_PRESS) {
+        pc->data2[0] += 0.1;
+    }
+    if (glfwGetKey(engine->window.window, GLFW_KEY_COMMA) == GLFW_PRESS) {
+        pc->data2[0] -= 0.1;
+    }
+}

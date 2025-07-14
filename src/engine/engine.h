@@ -15,3 +15,6 @@ void engine_initialise(Engine* engine);
 void engine_run(Engine* engine);
 void engine_cleanup(Engine* engine);
 
+// internal
+
+void process_inputs(Engine* engine);

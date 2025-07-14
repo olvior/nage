@@ -4,11 +4,30 @@ layout(local_size_x = 16, local_size_y = 16) in;
 
 layout(rgba16f,set = 0, binding = 0) uniform image2D image;
 
-const int max_iters = 500;
+layout( push_constant ) uniform constants
+{
+ ivec4 data1;
+ vec4 data2;
+ vec4 data3;
+ vec4 data4;
+} PushConstants;
+
+int get_max_iters() {
+    return PushConstants.data1.x;
+}
+
+float get_zoom() {
+    return pow(2, PushConstants.data2.x);
+}
+
+vec2 get_translation() {
+    return PushConstants.data2.yz;
+}
+
 
 int calc_iters(vec2 c) {
     vec2 z = vec2(0, 0);
-    for (int i = 1; i<=max_iters; i++) {
+    for (int i = 1; i<=get_max_iters(); i++) {
         float real = z.x*z.x - z.y*z.y + c.x;
         float imaginary = 2.0*z.x*z.y + c.y;
         z = vec2(real, imaginary);
@@ -16,31 +35,25 @@ int calc_iters(vec2 c) {
             return i;
         }
     }
-    return max_iters;
+    return get_max_iters();
 }
-
-float fmodaaa(float x, float y) {
-    return x - float(int(x) / int(y)) * x;
-}
-
 
 void main()
 {
     ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
     ivec2 size = imageSize(image);
 
-
-    vec2 coord = (vec2(texelCoord) / size * 2.0 - 1.0) - vec2(0.4, 0);
+    vec2 coord = (vec2(texelCoord) / size * 2.0 - 1.0) / get_zoom() + get_translation();
 
     int iters_taken = calc_iters(coord);
-    float x = iters_taken * 1.0 / max_iters;
+    float x = iters_taken * 1.0 / get_max_iters();
 
     // x = x * 10;
     x = clamp(x, 0, 1);
     // vec4 color = vec4(x, 0.77 * x, 0.25 * x, 0.5);
     vec4 color = vec4(0, 0.5 * x, 1 * x, 0.5);
 
-    if (iters_taken == max_iters) {
+    if (iters_taken == get_max_iters()) {
         color = vec4(0.0, 0.0, 0.0, 0.0);
     }
 

@@ -4,9 +4,18 @@
 
 #include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
+#include <cglm/cglm.h>
 
 typedef struct VmaAllocator_T* VmaAllocator;
 typedef struct VmaAllocation_T* VmaAllocation;
+
+typedef struct {
+	ivec4 data1;
+	vec4 data2;
+	vec4 data3;
+	vec4 data4;
+} PushConstants;
+
 
 typedef struct {
     VkImage image;
@@ -48,7 +57,6 @@ typedef struct {
     VkDescriptorSet draw_image_desc_set;
     VkDescriptorSetLayout draw_image_desc_layout;
 
-
     VkCommandPool command_pools[FRAMES_IN_FLIGHT];
     VkCommandBuffer command_buffers[FRAMES_IN_FLIGHT];
 
@@ -60,6 +68,8 @@ typedef struct {
     VkCommandBuffer imm_cmd_buf;
     VkFence imm_fence;
     VkDescriptorPool imgui_pool;
+
+	PushConstants push_constants;
 
     int frame_in_flight;
     int frame;

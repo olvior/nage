@@ -1,3 +1,4 @@
 -DDEBUG
 -Ithird_party/VulkanMemoryAllocator/include
 -Ithird_party/imgui
+-Ithird_party/cglm/include

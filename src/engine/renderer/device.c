@@ -4,23 +4,19 @@
 
 // macos just needs one extra extension :)
 #ifdef __APPLE__
-    const int DEVICE_EXTENSION_COUNT = 8;
+    const int DEVICE_EXTENSION_COUNT = 4;
     const char* DEVICE_EXTENSIONS[DEVICE_EXTENSION_COUNT] = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
         "VK_KHR_portability_subset",
-        // "VK_KHR_push_descriptor",
-        "VK_KHR_dynamic_rendering",
-        "VK_KHR_depth_stencil_resolve",
-        "VK_KHR_create_renderpass2",
-        "VK_KHR_multiview",
-        "VK_KHR_maintenance2",
+        "VK_KHR_push_descriptor",
     };
 #else
-    const int DEVICE_EXTENSION_COUNT = 2;
+    const int DEVICE_EXTENSION_COUNT = 3;
     static const char* DEVICE_EXTENSIONS[DEVICE_EXTENSION_COUNT] = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+        "VK_KHR_push_descriptor",
     };
 #endif
 

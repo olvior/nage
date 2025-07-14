@@ -96,9 +96,11 @@ void renderer_draw(Renderer* renderer)
     vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_COMPUTE, renderer->pipeline_layout,
             0, 1, &renderer->draw_image_desc_set, 0, NULL);
 
+    vkCmdPushConstants(cmd_buf, renderer->pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+            sizeof(PushConstants), &renderer->push_constants);
+
     vkCmdDispatch(cmd_buf, ceilf(renderer->swapchain.extent.width / 16.0),
             ceilf(renderer->swapchain.extent.height / 16.0), 1);
-
 
 
     transition_image(cmd_buf, renderer->device, renderer->draw_image.image,

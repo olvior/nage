@@ -127,12 +127,21 @@ void imgui_draw(Renderer* renderer, VkCommandBuffer cmd_buf, VkImageView target_
     func_end(cmd_buf);
 }
 
-void imgui_frame(ImGuiIO* io)
+void imgui_frame(ImGuiIO* io, Renderer* renderer)
 {
     cImGui_ImplVulkan_NewFrame();
     cImGui_ImplGlfw_NewFrame();
     ImGui_NewFrame();
-    ImGui_ShowDemoWindow(NULL);
+
+
+    if (ImGui_Begin("Settings", NULL, 0))
+    {
+        ImGui_SliderInt("Iterations", &renderer->push_constants.data1[0], 0, 1000);
+        ImGui_SliderFloat("Zoom", &renderer->push_constants.data2[0], 0.1, 10);
+        ImGui_SliderFloat("Translation x", &renderer->push_constants.data2[1], -2, 2);
+        ImGui_SliderFloat("Translation y", &renderer->push_constants.data2[2], -2, 2);
+    }
+    ImGui_End();
 
     ImGui_Render();
 
