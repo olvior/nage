@@ -1,12 +1,11 @@
 #include "engine.h"
-#include <stdio.h>
+#include "utils.h"
 
 #include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
 
-#include <dcimgui.h>
-#include <dcimgui_impl_vulkan.h>
-#include <dcimgui_impl_glfw.h>
+#include <imgui/dcimgui_impl_vulkan.h>
+#include <imgui/dcimgui_impl_glfw.h>
 
 #include "dearimgui.h"
 
@@ -28,8 +27,8 @@ void engine_run(Engine* engine)
         if (i >= 100) {
             double current_time = glfwGetTime();
             double delta = current_time - old_time;
-            printf("100 frames took %lf ", delta);
-            printf("(%.1lf fps)\n", 100 / delta);
+            LOG_V("100 frames took %lf ", delta);
+            LOG_B("(%.1lf fps)\n", 100 / delta);
             old_time = glfwGetTime();
             i = 0;
         }
@@ -55,24 +54,24 @@ void engine_cleanup(Engine* engine)
 
 void process_inputs(Engine* engine)
 {
-    PushConstants* pc = &engine->renderer.push_constants;
-    float zoom = powf(2, pc->data2[0]);
-    if (glfwGetKey(engine->window.window, GLFW_KEY_LEFT) == GLFW_PRESS) {
-        pc->data2[1] -= 0.1 / zoom;
-    }
-    if (glfwGetKey(engine->window.window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
-        pc->data2[1] += 0.1 / zoom;
-    }
-    if (glfwGetKey(engine->window.window, GLFW_KEY_UP) == GLFW_PRESS) {
-        pc->data2[2] -= 0.1 / zoom;
-    }
-    if (glfwGetKey(engine->window.window, GLFW_KEY_DOWN) == GLFW_PRESS) {
-        pc->data2[2] += 0.1 / zoom;
-    }
-    if (glfwGetKey(engine->window.window, GLFW_KEY_PERIOD) == GLFW_PRESS) {
-        pc->data2[0] += 0.1;
-    }
-    if (glfwGetKey(engine->window.window, GLFW_KEY_COMMA) == GLFW_PRESS) {
-        pc->data2[0] -= 0.1;
-    }
+    // PushConstants* pc = &engine->renderer.push_constants;
+    // float zoom = powf(2, pc->data2[0]);
+    // if (glfwGetKey(engine->window.window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+    //     pc->data2[1] -= 0.1 / zoom;
+    // }
+    // if (glfwGetKey(engine->window.window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+    //     pc->data2[1] += 0.1 / zoom;
+    // }
+    // if (glfwGetKey(engine->window.window, GLFW_KEY_UP) == GLFW_PRESS) {
+    //     pc->data2[2] -= 0.1 / zoom;
+    // }
+    // if (glfwGetKey(engine->window.window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+    //     pc->data2[2] += 0.1 / zoom;
+    // }
+    // if (glfwGetKey(engine->window.window, GLFW_KEY_PERIOD) == GLFW_PRESS) {
+    //     pc->data2[0] += 0.1;
+    // }
+    // if (glfwGetKey(engine->window.window, GLFW_KEY_COMMA) == GLFW_PRESS) {
+    //     pc->data2[0] -= 0.1;
+    // }
 }

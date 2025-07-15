@@ -39,7 +39,7 @@ void pick_gpu(Renderer* renderer)
     int scores[device_count];
     vkEnumeratePhysicalDevices(renderer->instance, &device_count, devices_found);
 
-    printf("Devices list:\n");
+    LOG_V("Devices list:\n");
     int max_score = UNSUPPORTED_GPU;
     int max_idx = UNSUPPORTED_GPU;
     for (int i = 0; i < device_count; ++i)
@@ -53,7 +53,7 @@ void pick_gpu(Renderer* renderer)
 
         VkPhysicalDeviceProperties p;
         vkGetPhysicalDeviceProperties(devices_found[i], &p);
-        printf("%s %d\n", p.deviceName, scores[i]);
+        LOG_V("%s %d\n", p.deviceName, scores[i]);
     }
 
 
@@ -64,9 +64,9 @@ void pick_gpu(Renderer* renderer)
 
     VkPhysicalDeviceProperties p;
     vkGetPhysicalDeviceProperties(renderer->gpu, &p);
-    printf("Picked: %s", p.deviceName);
     uint32_t v = p.apiVersion;
-    printf(" version %d.%d.%d\n", VK_API_VERSION_MAJOR(v), VK_API_VERSION_MINOR(v), VK_API_VERSION_PATCH(v));
+    LOG_V("Picked: %s version %d.%d.%d\n", p.deviceName, VK_API_VERSION_MAJOR(v),
+            VK_API_VERSION_MINOR(v), VK_API_VERSION_PATCH(v));
 }
 
 void create_device(Renderer* renderer)
@@ -85,18 +85,30 @@ void create_device(Renderer* renderer)
     VkPhysicalDeviceFeatures device_features = {0};
 
     // enable the feature
+    VkPhysicalDeviceBufferDeviceAddressFeatures buffer_address_feature = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES,
+        .bufferDeviceAddress = VK_TRUE,
+    };
+
     VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_feature = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR,
+        .pNext = &buffer_address_feature,
         .dynamicRendering = VK_TRUE,
+    };
+
+    VkPhysicalDeviceFeatures2 device_features2 = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+        .pNext = &dynamic_rendering_feature,
+        .features = device_features,
     };
 
     VkDeviceCreateInfo device_create_info = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .pNext = &dynamic_rendering_feature,
+        .pNext = &device_features2,
         .pQueueCreateInfos = &queue_create_info,
         .queueCreateInfoCount = 1,
 
-        .pEnabledFeatures = &device_features,
+        // .pEnabledFeatures = &device_features,
 
         .ppEnabledExtensionNames = DEVICE_EXTENSIONS,
         .enabledExtensionCount = DEVICE_EXTENSION_COUNT,

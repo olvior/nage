@@ -67,7 +67,7 @@ void get_required_extensions(uint32_t* count, const char** extensions)
     extensions[*count - 1] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
     #endif
 
-    printf("extensions needed = %d\n", *count);
+    LOG_V("extensions needed = %d\n", *count);
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
@@ -79,7 +79,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
     if (m_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
         LOG_W("validation layers - %s: %s\n", p_data->pMessageIdName, p_data->pMessage);
     else if (m_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
-        LOG_W("validation layers - %s: %s\n", p_data->pMessageIdName, p_data->pMessage);
+        LOG_E("validation layers - %s: %s\n", p_data->pMessageIdName, p_data->pMessage);
 
     return VK_FALSE;
 }

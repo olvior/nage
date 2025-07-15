@@ -2,7 +2,7 @@
 
 #include "window.h"
 #include "renderer/renderer.h"
-#include <dcimgui.h>
+#include <imgui/dcimgui.h>
 
 typedef struct {
     Renderer renderer;

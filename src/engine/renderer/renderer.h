@@ -5,17 +5,32 @@
 #include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
 #include <cglm/cglm.h>
-
-typedef struct VmaAllocator_T* VmaAllocator;
-typedef struct VmaAllocation_T* VmaAllocation;
+#include <vk_mem_alloc.h>
 
 typedef struct {
-	ivec4 data1;
-	vec4 data2;
-	vec4 data3;
-	vec4 data4;
+    vec3 position;
+    float uv_x;
+    vec3 normal;
+    float uv_y;
+    vec4 colour;
+} Vertex;
+
+typedef struct {
+    mat4 world_matrix;
+    VkDeviceAddress vertex_buffer;
 } PushConstants;
 
+typedef struct {
+    VkBuffer buffer;
+    VmaAllocation allocation;
+    VmaAllocationInfo info;
+} Buffer;
+
+typedef struct {
+    Buffer index_buffer;
+    Buffer vertex_buffer;
+    VkDeviceAddress vertex_buffer_address;
+} MeshBuffers;
 
 typedef struct {
     VkImage image;
@@ -69,7 +84,7 @@ typedef struct {
     VkFence imm_fence;
     VkDescriptorPool imgui_pool;
 
-	PushConstants push_constants;
+    MeshBuffers mesh;
 
     int frame_in_flight;
     int frame;
@@ -83,6 +98,9 @@ void renderer_cleanup(Renderer* renderer);
 int validation_layers_count();
 const char** validation_layers();
 
+void immediate_begin(Renderer* renderer);
+void immediate_end(Renderer* renderer);
+
 // internal
 void renderer_create_instance(Renderer* renderer);
 void renderer_create_surface(Renderer* renderer, GLFWwindow* window);
@@ -94,4 +112,7 @@ void renderer_inc_frame(Renderer* renderer);
 void vma_allocator_initialise(Renderer* renderer);
 void sync_initialise(Renderer* renderer);
 void sync_cleanup(Renderer* renderer);
+
+void draw_geometry(Renderer* renderer, VkCommandBuffer cmd_buf);
+void initialise_data(Renderer* renderer);
 

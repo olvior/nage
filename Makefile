@@ -2,11 +2,12 @@ CC = gcc
 CCP = g++
 CFLAGS = -Wall -g -DDEBUG -MMD
 # CFLAGS = -Wall -O3 -MMD
-CFLAGS += -Ithird_party/VulkanMemoryAllocator/include -Ithird_party/imgui -Ithird_party/cglm/include
+CFLAGS += -Ithird_party/include
 LFLAGS = -lvulkan -lglfw
 BUILD_DIR = bin
 SRC_DIR = src
 SHADER_DIR = src/shaders
+RUNTIME_DIR = out
 TARGET = vk_engine
 
 # Finds all the c files in 1, 2, and 3 lvl directories $(SRC_DIR)
@@ -20,7 +21,7 @@ INCLUDES = $(SRCS:%.c=%.h)
 OBJS = $(SRCS:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
 OBJS += $(VMA_USAGE:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
 DEPS = ${OBJS:%.o=%.d}
-SPV_SHADERS = $(SHADERS:$(SHADER_DIR)/shader.%=$(BUILD_DIR)/%.spv)
+SPV_SHADERS = $(SHADERS:$(SHADER_DIR)/shader.%=$(RUNTIME_DIR)/%.spv)
 
 IMGUI_DIR = third_party/imgui
 IMGUI_SRCS = $(wildcard $(IMGUI_DIR)/*.cpp)
@@ -32,13 +33,14 @@ ifeq ($(UNAME_S),Darwin)
 	LFLAGS += -rpath /usr/local/lib
 endif
 
-all: $(BUILD_DIR)/$(TARGET) $(SPV_SHADERS)
+all: $(RUNTIME_DIR)/$(TARGET) $(SPV_SHADERS)
 
-$(BUILD_DIR)/$(TARGET): $(OBJS)
-	 $(CCP) $(CFLAGS) -o $(BUILD_DIR)/$(TARGET) $(OBJS) $(LFLAGS)
+$(RUNTIME_DIR)/$(TARGET): $(OBJS)
+	mkdir -p $(RUNTIME_DIR)
+	$(CCP) $(CFLAGS) -o $(RUNTIME_DIR)/$(TARGET) $(OBJS) $(LFLAGS)
 
 ifeq ($(UNAME_S),Darwin)
-	dsymutil $(BUILD_DIR)/$(TARGET)
+	dsymutil $(RUNTIME_DIR)/$(TARGET)
 endif
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
@@ -53,21 +55,21 @@ $(BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(@D)
 	$(CCP) -std=c++20 ${CFLAGS} -c $< -o $@
 
-$(BUILD_DIR)/%.spv: $(SHADER_DIR)/shader.%
+$(RUNTIME_DIR)/%.spv: $(SHADER_DIR)/shader.%
 	glslc $< -o $@
 
 -include ${DEPS}
 
 .PHONY: clean debug run all
 
-run: $(BUILD_DIR)/$(TARGET) $(SPV_SHADERS)
-	(cd $(BUILD_DIR); ./$(TARGET))
+run: $(RUNTIME_DIR)/$(TARGET) $(SPV_SHADERS)
+	(cd $(RUNTIME_DIR); ./$(TARGET))
 
 clean:
 	rm -f $(OBJS)
 	rm -f $(DEPS)
 	rm -f $(SPV_SHADERS)
-	rm -rf $(BUILD_DIR)/$(TARGET).dSYM
+	rm -rf $(RUNTIME_DIR)/$(TARGET).dSYM
 
 debug:
 	@echo SRCS is: $(SRCS)

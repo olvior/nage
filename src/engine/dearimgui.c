@@ -3,9 +3,8 @@
 
 #include <vulkan/vulkan.h>
 
-#include <dcimgui.h>
-#include <dcimgui_impl_glfw.h>
-#include <dcimgui_impl_vulkan.h>
+#include <imgui/dcimgui_impl_glfw.h>
+#include <imgui/dcimgui_impl_vulkan.h>
 
 void imgui_initialise(Renderer* renderer, GLFWwindow* window, ImGuiIO** io_out)
 {
@@ -136,10 +135,10 @@ void imgui_frame(ImGuiIO* io, Renderer* renderer)
 
     if (ImGui_Begin("Settings", NULL, 0))
     {
-        ImGui_SliderInt("Iterations", &renderer->push_constants.data1[0], 0, 1000);
-        ImGui_SliderFloat("Zoom", &renderer->push_constants.data2[0], 0.1, 10);
-        ImGui_SliderFloat("Translation x", &renderer->push_constants.data2[1], -2, 2);
-        ImGui_SliderFloat("Translation y", &renderer->push_constants.data2[2], -2, 2);
+        // ImGui_SliderInt("Iterations", &renderer->push_constants.data1[0], 0, 1000);
+        // ImGui_SliderFloat("Zoom", &renderer->push_constants.data2[0], 0.1, 10);
+        // ImGui_SliderFloat("Translation x", &renderer->push_constants.data2[1], -2, 2);
+        // ImGui_SliderFloat("Translation y", &renderer->push_constants.data2[2], -2, 2);
     }
     ImGui_End();
 

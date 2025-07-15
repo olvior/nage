@@ -35,6 +35,6 @@ void window_cleanup(Window* window)
 
 void framebuffer_resize_callback(GLFWwindow* window, int width, int height)
 {
-    printf("We got resized!\n");
+    LOG("We got resized! ");
 }
 

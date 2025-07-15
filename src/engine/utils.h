@@ -48,10 +48,21 @@
         LOG(msg, ##__VA_ARGS__);          \
     } while (0)
 
+#define LOG_V(msg, ...)                        \
+    do {                                       \
+        printf("%s:%d: ", __FILE__, __LINE__); \
+        printf(msg, ##__VA_ARGS__);            \
+    } while (0)
+
 #define LOG(msg, ...)                                                  \
     do {                                                               \
         fprintf(stderr, msg, ##__VA_ARGS__);                           \
         fprintf(stderr, "- %s:%d@%s\n", __FILE__, __LINE__, __func__); \
+    } while (0)
+
+#define LOG_B(msg, ...)             \
+    do {                            \
+        printf(msg, ##__VA_ARGS__); \
     } while (0)
 
 #define SET_COLOUR(x, place)             \
@@ -78,5 +89,5 @@ uint32_t clamp(uint32_t a, uint32_t min, uint32_t max);
 QueueFamilyIndices find_queue_families(VkPhysicalDevice* gpu, VkSurfaceKHR* surface);
 bool indices_complete(QueueFamilyIndices* indeces);
 
-
+void* get_device_proc_adr(VkDevice device, char name[]);
 

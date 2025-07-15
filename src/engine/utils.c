@@ -7,8 +7,7 @@ File read_file(char path[])
 
     if (fp == NULL)
     {
-        printf("Could not open file %s\n", path);
-        exit(-1);
+        FATAL("Could not open file %s\n", path);
     }
 
     fseek(fp, 0, SEEK_END);
@@ -30,7 +29,7 @@ File read_file(char path[])
 void print_string_list(const char* b[], int n)
 {
     for (int i = 0; i < n; ++i)
-        printf("%s\n", b[i]);
+        LOG_V("%s\n", b[i]);
 }
 
 uint32_t clamp(uint32_t a, uint32_t min, uint32_t max)
@@ -75,3 +74,12 @@ bool indices_complete(QueueFamilyIndices* indices)
     return indices->graphics_family != INVALID_IDX && indices->present_family != INVALID_IDX;
 }
 
+void* get_device_proc_adr(VkDevice device, char name[])
+{
+    void* func = vkGetDeviceProcAddr(device, name);
+
+    if (func == NULL)
+        FATAL("Could not find address of %s\n", name);
+
+    return func;
+}

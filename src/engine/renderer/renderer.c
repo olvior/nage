@@ -4,11 +4,11 @@
 #include "swapchain.h"
 #include "image.h"
 #include "pipeline.h"
+#include "buffers.h"
 #include "../dearimgui.h"
 #include "../utils.h"
 
-#include <math.h>
-#include <vk_mem_alloc.h>
+// #include <math.h>
 
 const int VALIDATION_LAYERS_COUNT = 1;
 const char* VALIDATION_LAYERS[VALIDATION_LAYERS_COUNT] = {
@@ -44,12 +44,17 @@ void renderer_initialise(Renderer* renderer, GLFWwindow* window)
 
     pipeline_initialise(renderer);
 
+    initialise_data(renderer);
+
     renderer->frame_in_flight = 0;
     renderer->frame = 0;
 }
 
 void renderer_cleanup(Renderer* renderer)
 {
+    buffer_destroy(&renderer->mesh.index_buffer, renderer->allocator);
+    buffer_destroy(&renderer->mesh.vertex_buffer, renderer->allocator);
+
     pipeline_cleanup(renderer);
 
     sync_cleanup(renderer);
@@ -88,23 +93,24 @@ void renderer_draw(Renderer* renderer)
     VK_CHECK(vkBeginCommandBuffer(cmd_buf, &begin_info));
 
     transition_image(cmd_buf, renderer->device, renderer->draw_image.image,
-            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
+    draw_geometry(renderer, cmd_buf);
 
-    vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_COMPUTE, renderer->pipeline);
-
-    vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_COMPUTE, renderer->pipeline_layout,
-            0, 1, &renderer->draw_image_desc_set, 0, NULL);
-
-    vkCmdPushConstants(cmd_buf, renderer->pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
-            sizeof(PushConstants), &renderer->push_constants);
-
-    vkCmdDispatch(cmd_buf, ceilf(renderer->swapchain.extent.width / 16.0),
-            ceilf(renderer->swapchain.extent.height / 16.0), 1);
+    // vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_COMPUTE, renderer->pipeline);
+    //
+    // vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_COMPUTE, renderer->pipeline_layout,
+    //         0, 1, &renderer->draw_image_desc_set, 0, NULL);
+    //
+    // vkCmdPushConstants(cmd_buf, renderer->pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+    //         sizeof(PushConstants), &renderer->push_constants);
+    //
+    // vkCmdDispatch(cmd_buf, ceilf(renderer->swapchain.extent.width / 16.0),
+    //         ceilf(renderer->swapchain.extent.height / 16.0), 1);
 
 
     transition_image(cmd_buf, renderer->device, renderer->draw_image.image,
-            VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     transition_image(cmd_buf, renderer->device, renderer->swapchain.images[image_index],
             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
@@ -145,8 +151,73 @@ void renderer_draw(Renderer* renderer)
     renderer_inc_frame(renderer);
 }
 
-void draw_background(Renderer* renderer)
+void draw_geometry(Renderer* renderer, VkCommandBuffer cmd_buf)
 {
+    VkClearValue clear_value = {
+        .color = { {0.1f, 0.2f, 0.3f, 1.0f} }
+    };
+    VkRenderingAttachmentInfoKHR colour_attachment = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+        .pNext = NULL,
+        .imageView = renderer->draw_image.view,
+        .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+        .clearValue = clear_value,
+    };
+
+    VkRenderingInfoKHR render_info = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+        .renderArea = {
+            .offset = {0, 0},
+            .extent = { renderer->draw_image.extent.width, renderer->draw_image.extent.height },
+        },
+
+        .layerCount = 1,
+        .viewMask = 0,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &colour_attachment,
+    };
+
+
+    void* func = get_device_proc_adr(renderer->device, "vkCmdBeginRenderingKHR");
+    ((PFN_vkCmdBeginRenderingKHR)(func))(cmd_buf, &render_info);
+
+    vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer->pipeline);
+
+    // dynamic viewport and scissor
+    VkViewport viewport = {
+        .x = 0,
+        .y = 0,
+        .width = renderer->draw_image.extent.width,
+        .height = renderer->draw_image.extent.height,
+
+        .minDepth = 0.f,
+        .maxDepth = 1.f,
+    };
+
+    vkCmdSetViewport(cmd_buf, 0, 1, &viewport);
+
+    VkRect2D scissor = {
+        .offset = { 0, 0 },
+        .extent = {renderer->draw_image.extent.width, renderer->draw_image.extent.height},
+    };
+
+    vkCmdSetScissor(cmd_buf, 0, 1, &scissor);
+
+    PushConstants push_constants = {
+        .world_matrix = GLM_MAT4_IDENTITY_INIT,
+        .vertex_buffer = renderer->mesh.vertex_buffer_address,
+    };
+
+    vkCmdPushConstants(cmd_buf, renderer->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
+            sizeof(PushConstants), &push_constants);
+    vkCmdBindIndexBuffer(cmd_buf, renderer->mesh.index_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdDrawIndexed(cmd_buf, 9, 1, 0, 0, 0);
+    // vkCmdDraw(cmd_buf, 3, 1, 0, 0);
+
+    func = get_device_proc_adr(renderer->device, "vkCmdEndRenderingKHR");
+    ((PFN_vkCmdEndRenderingKHR)(func))(cmd_buf);
 }
 
 void renderer_create_instance(Renderer* renderer)
@@ -206,8 +277,7 @@ void vma_allocator_initialise(Renderer* renderer)
         .physicalDevice = renderer->gpu,
         .device = renderer->device,
         .instance = renderer->instance,
-        // .flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
-        // tutorials wants this but probably not needed
+        .flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
     };
 
     vmaCreateAllocator(&allocator_info, &renderer->allocator);
@@ -327,6 +397,22 @@ void sync_cleanup(Renderer* renderer)
     vkDestroyFence(renderer->device, renderer->imm_fence, NULL);
 }
 
+void initialise_data(Renderer* renderer)
+{
+    const int n_vertices = 5;
+    Vertex vertices[n_vertices] = {
+        { .position = {0.5,-0.5, 0}, .colour = {0, 0, 1, 1} },
+        { .position = {0.5,0.5, 0}, .colour = {1, 0, 0, 1} },
+        { .position = {-0.5,-0.5, 0}, .colour = {0, 1, 0, 1} },
+        { .position = {-0.5,0.5, 0}, .colour = {0, 0, 1, 1} },
+        { .position = {0,0.9, 0}, .colour = {0, 0, 1, 1} },
+    };
+
+    const int n_indices = 9;
+    uint32_t indices[n_indices] = {0, 1, 2, 2, 1, 3, 3, 1, 4};
+
+    renderer->mesh = upload_mesh(renderer, indices, n_indices, vertices, n_vertices);
+}
 
 VkSubmitInfo get_submit_info(Renderer* renderer)
 {
