@@ -97,6 +97,7 @@ typedef struct {
     VkCommandPool imm_cmd_pool;
     VkCommandBuffer imm_cmd_buf;
     VkFence imm_fence;
+    Image imgui_image;
     VkDescriptorPool imgui_pool;
 
     Mesh mesh;
@@ -105,6 +106,8 @@ typedef struct {
 
     int frame_in_flight;
     int frame;
+
+    bool resize_requested;
 } Renderer;
 
 

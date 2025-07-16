@@ -1,6 +1,6 @@
 #include "engine.h"
 #include "utils.h"
-#include "scene/loader.h"
+#include "renderer/swapchain.h"
 
 #include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
@@ -36,6 +36,10 @@ void engine_run(Engine* engine)
             LOG_B("(%.1lf fps)\n", 100 / delta);
             old_time = glfwGetTime();
             i = 0;
+        }
+
+        if (engine->renderer.resize_requested) {
+            swapchain_resize(&engine->renderer, &engine->window);
         }
 
         glfwPollEvents();

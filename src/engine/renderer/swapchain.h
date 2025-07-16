@@ -4,6 +4,7 @@
 #include <GLFW/glfw3.h>
 
 #include "renderer.h"
+#include "../window.h"
 
 typedef struct {
     VkSurfaceCapabilitiesKHR capabilities;
@@ -26,4 +27,5 @@ VkPresentModeKHR choose_swap_present_mode(SwapChainSupportDetails* details);
 VkExtent2D choose_swap_extent(GLFWwindow* window, VkSurfaceCapabilitiesKHR* capabilities);
 void create_drawing_image(Renderer* renderer);
 void create_depth_image(Renderer* renderer);
+void swapchain_resize(Renderer* renderer, Window* window);
 

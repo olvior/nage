@@ -1,3 +1,6 @@
+#define CGLM_FORCE_DEPTH_ZERO_TO_ONE
+#define CGLM_FORCE_LEFT_HANDED
+
 #include "renderer.h"
 #include "debug.h"
 #include "device.h"
@@ -78,10 +81,13 @@ void renderer_draw(Renderer* renderer)
     VK_CHECK(vkResetFences(renderer->device, 1, &renderer->fences[frame]));
 
     uint32_t image_index;
-    VK_CHECK(
-            vkAcquireNextImageKHR(renderer->device, renderer->swapchain.swapchain, ONE_SEC,
-                renderer->semaphores_swapchain[frame], NULL, &image_index)
-    );
+    VkResult e = vkAcquireNextImageKHR(renderer->device, renderer->swapchain.swapchain, ONE_SEC,
+            renderer->semaphores_swapchain[frame], NULL, &image_index);
+
+   if (e == VK_ERROR_OUT_OF_DATE_KHR) {
+        renderer->resize_requested = true;
+        return;
+    }
 
     // init the command buffer
     VkCommandBuffer cmd_buf = renderer->command_buffers[frame];
@@ -116,18 +122,28 @@ void renderer_draw(Renderer* renderer)
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     transition_image(cmd_buf, renderer->device, renderer->swapchain.images[image_index],
             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    // transition_image(cmd_buf, renderer->device, renderer->imgui_image.image,
+    //         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    // imgui_draw(renderer, cmd_buf, renderer->imgui_image.view);
+
+    // transition_image(cmd_buf, renderer->device, renderer->imgui_image.image,
+    //         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
     VkExtent2D draw_extent = {renderer->draw_image.extent.width, renderer->draw_image.extent.height};
     copy_image(cmd_buf, renderer->draw_image.image, renderer->swapchain.images[image_index],
             draw_extent, renderer->swapchain.extent);
-
+    // copy_image(cmd_buf, renderer->imgui_image.image, renderer->swapchain.images[image_index],
+    //         draw_extent, renderer->swapchain.extent);
     transition_image(cmd_buf, renderer->device, renderer->swapchain.images[image_index],
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
     imgui_draw(renderer, cmd_buf, renderer->swapchain.image_views[image_index]);
 
+
     transition_image(cmd_buf, renderer->device, renderer->swapchain.images[image_index],
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    // transition_image(cmd_buf, renderer->device, renderer->swapchain.images[image_index],
+    //         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     VK_CHECK(vkEndCommandBuffer(cmd_buf));
 
@@ -149,7 +165,9 @@ void renderer_draw(Renderer* renderer)
         .pImageIndices = &image_index,
     };
 
-    VK_CHECK(vkQueuePresentKHR(renderer->graphics_queue, &present_info));
+    e = vkQueuePresentKHR(renderer->graphics_queue, &present_info);
+    if (e == VK_ERROR_OUT_OF_DATE_KHR)
+        renderer->resize_requested = true;
 
     renderer_inc_frame(renderer);
 }
@@ -222,17 +240,30 @@ void draw_geometry(Renderer* renderer, VkCommandBuffer cmd_buf)
 
     VkExtent3D draw_extent = renderer->draw_image.extent;
     vec3 translation = {renderer->translation[0], renderer->translation[1], renderer->translation[2]};
-    mat4 view = GLM_MAT4_IDENTITY_INIT;
-    mat4 world_matrix;
-    mat4 proj = {0};
-    glm_translate(view, translation);
-    glm_perspective(glm_rad(renderer->fov), 1.0, 10000, 0.1, proj);
-    proj[1][1] *= -1;
 
-    glm_mat4_mul(view, proj, world_matrix);
+    vec3 camera_pos = { 0, -1, -6};
+    vec3 forward_dir = { 0, 0, 1 };
+    vec3 up_dir = { 0, -1, 0 };
+    mat4 view = GLM_MAT4_IDENTITY_INIT;
+
+    vec3 upped;
+    glm_vec3_add(camera_pos, forward_dir, upped);
+    glm_lookat(camera_pos, upped, up_dir, view);
+
+    mat4 proj = GLM_MAT4_IDENTITY_INIT;
+    float aspect = 1.0;
+
+    glm_perspective(glm_rad(renderer->fov), aspect, 0.1, 1000, proj);
+
+    mat4 model = GLM_MAT4_IDENTITY_INIT;
+    glm_translate(model, translation);
+
+    mat4 mvp = GLM_MAT4_IDENTITY_INIT;
+    glm_mat4_mulN((mat4* [3]){&proj, &view, &model}, 3, mvp);
+
 
     PushConstants push_constants = {
-        .world_matrix = MAT4_UNPACK(world_matrix),
+        .world_matrix = MAT4_UNPACK(mvp),
         .vertex_buffer = renderer->mesh.mesh_buffers.vertex_buffer_address,
     };
 
@@ -426,12 +457,13 @@ void sync_cleanup(Renderer* renderer)
 void initialise_data(Renderer* renderer)
 {
     // renderer->mesh = upload_mesh(renderer, indices, n_indices, vertices, n_vertices);
-    Mesh mesh = load_obj_meshes(renderer, "room.obj");
-    renderer->mesh = mesh;
+    Mesh* meshes = load_glft_meshes(renderer, "basicmesh.glb");
+    renderer->mesh = meshes[2];
 
     renderer->translation[0] = 0;
     renderer->translation[1] = 0;
     renderer->translation[1] = 0;
+    renderer->fov = 90;
 }
 
 VkSubmitInfo get_submit_info(Renderer* renderer)

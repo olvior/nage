@@ -35,4 +35,5 @@ void pipeline_builder_disable_blending(PipelineBuilder* pb);
 void pipeline_builder_set_color_attachment_format(PipelineBuilder* pb, VkFormat format);
 void pipeline_builder_set_depth_format(PipelineBuilder* pb, VkFormat format);
 void pipeline_builder_set_depthtest(PipelineBuilder* pb, bool enable_depth_write, VkCompareOp op);
+void pipeline_builder_enable_blending(PipelineBuilder* pb, bool additive);
 

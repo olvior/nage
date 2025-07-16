@@ -192,9 +192,10 @@ void create_pipeline(Renderer* renderer)
     pb.shader_stages[1] = frag_shader;
     pipeline_builder_set_input_topology(&pb, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
     pipeline_builder_set_polygon_mode(&pb, VK_POLYGON_MODE_FILL);
-    pipeline_builder_set_cull_mode(&pb, VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+    pipeline_builder_set_cull_mode(&pb, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE);
     pipeline_builder_set_multisampling_none(&pb);
     pipeline_builder_disable_blending(&pb);
+    // pipeline_builder_enable_blending(&pb, false);
     pipeline_builder_set_depthtest(&pb, true, VK_COMPARE_OP_GREATER_OR_EQUAL);
 
     pipeline_builder_set_color_attachment_format(&pb, renderer->draw_image.format);
@@ -332,6 +333,23 @@ void pipeline_builder_disable_blending(PipelineBuilder* pb)
     pb->colour_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
         | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     pb->colour_blend_attachment.blendEnable = VK_FALSE;
+}
+
+void pipeline_builder_enable_blending(PipelineBuilder* pb, bool additive)
+{
+    pb->colour_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    pb->colour_blend_attachment.blendEnable = VK_TRUE;
+    pb->colour_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+
+    pb->colour_blend_attachment.dstColorBlendFactor = additive ?
+        VK_BLEND_FACTOR_ONE : VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+
+    pb->colour_blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
+    pb->colour_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    pb->colour_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    pb->colour_blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
+
 }
 
 void pipeline_builder_set_color_attachment_format(PipelineBuilder* pb, VkFormat format)

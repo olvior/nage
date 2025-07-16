@@ -1,6 +1,8 @@
 #include "dearimgui.h"
 #include "utils.h"
 
+#include "renderer/image.h"
+
 #include <vulkan/vulkan.h>
 
 #include <imgui/dcimgui_impl_glfw.h>
@@ -34,6 +36,33 @@ void imgui_initialise(Renderer* renderer, GLFWwindow* window, ImGuiIO** io_out)
     VkDescriptorPool imgui_pool;
 
     VK_CHECK(vkCreateDescriptorPool(renderer->device, &pool_info, NULL, &imgui_pool));
+
+    // create imgui's image
+
+    VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+
+    VkExtent3D extent = {
+        .width = renderer->swapchain.extent.width,
+        .height = renderer->swapchain.extent.height,
+        .depth = 1,
+    };
+
+    VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    VkImageCreateInfo image_create_info = get_image_create_info(format, flags, extent);
+
+    VmaAllocationCreateInfo image_alloc_info = {
+        .usage = VMA_MEMORY_USAGE_GPU_ONLY,
+        .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    };
+
+    vmaCreateImage(renderer->allocator, &image_create_info, &image_alloc_info,
+            &renderer->imgui_image.image, &renderer->imgui_image.allocation, NULL);
+
+    VkImageViewCreateInfo image_view_info = get_image_view_create_info(format,
+            renderer->imgui_image.image, VK_IMAGE_ASPECT_COLOR_BIT);
+
+    VK_CHECK(vkCreateImageView(renderer->device, &image_view_info, NULL, &renderer->imgui_image.view));
 
     // init imgui
     ImGui_CreateContext(NULL);
@@ -76,6 +105,9 @@ void imgui_cleanup(Renderer* renderer)
 {
     cImGui_ImplVulkan_Shutdown();
     vkDestroyDescriptorPool(renderer->device, renderer->imgui_pool, NULL);
+
+    vkDestroyImageView(renderer->device, renderer->imgui_image.view, NULL);
+    vmaDestroyImage(renderer->allocator, renderer->imgui_image.image, renderer->imgui_image.allocation);
 }
 
 void imgui_draw(Renderer* renderer, VkCommandBuffer cmd_buf, VkImageView target_image_view)

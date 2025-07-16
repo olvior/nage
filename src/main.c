@@ -3,7 +3,7 @@
 
 int main()
 {
-	Engine engine;
+	Engine engine = {0};
 	printf("%lu e\n", sizeof(Engine));
 
     engine_initialise(&engine);

@@ -115,6 +115,21 @@ void create_swap_chain(Renderer* renderer, GLFWwindow* window)
     swapchain->extent = extent;
 }
 
+void swapchain_resize(Renderer* renderer, Window* window)
+{
+    vkDeviceWaitIdle(renderer->device);
+    swapchain_cleanup(renderer);
+
+    int w, h;
+    glfwGetFramebufferSize(window->window, &w, &h);
+
+    window->width = w;
+    window->height = h;
+
+    create_swap_chain(renderer, window->window);
+
+    renderer->resize_requested = false;
+}
 
 void query_swap_chain_support(Renderer* renderer, SwapChainSupportDetails* details)
 {
@@ -176,8 +191,8 @@ VkPresentModeKHR choose_swap_present_mode(SwapChainSupportDetails* details)
     for (int i = 0; i < details->present_mode_count; ++i)
     {
         VkPresentModeKHR m = details->present_modes[i];
-        if (m == VK_PRESENT_MODE_MAILBOX_KHR)
-        // if (m == VK_PRESENT_MODE_IMMEDIATE_KHR)
+        // if (m == VK_PRESENT_MODE_MAILBOX_KHR)
+        if (m == VK_PRESENT_MODE_IMMEDIATE_KHR)
             return m;
     }
 

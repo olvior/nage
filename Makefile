@@ -49,11 +49,11 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(@D)
-	$(CCP) -std=c++20 ${CFLAGS} -c $< -o $@
+	$(CCP) -std=c++20 ${CFLAGS} -w -c $< -o $@
 
 $(BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(@D)
-	$(CCP) -std=c++20 ${CFLAGS} -c $< -o $@
+	$(CCP) -std=c++20 ${CFLAGS} -w -c $< -o $@
 
 $(RUNTIME_DIR)/%.spv: $(SHADER_DIR)/shader.%
 	glslc $< -o $@
