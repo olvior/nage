@@ -7,6 +7,7 @@
 #include "buffers.h"
 #include "../dearimgui.h"
 #include "../utils.h"
+#include "../scene/loader.h"
 
 // #include <math.h>
 
@@ -52,8 +53,8 @@ void renderer_initialise(Renderer* renderer, GLFWwindow* window)
 
 void renderer_cleanup(Renderer* renderer)
 {
-    buffer_destroy(&renderer->mesh.index_buffer, renderer->allocator);
-    buffer_destroy(&renderer->mesh.vertex_buffer, renderer->allocator);
+    buffer_destroy(&renderer->mesh.mesh_buffers.index_buffer, renderer->allocator);
+    buffer_destroy(&renderer->mesh.mesh_buffers.vertex_buffer, renderer->allocator);
 
     pipeline_cleanup(renderer);
 
@@ -94,6 +95,8 @@ void renderer_draw(Renderer* renderer)
 
     transition_image(cmd_buf, renderer->device, renderer->draw_image.image,
             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    transition_image(cmd_buf, renderer->device, renderer->depth_image.image,
+            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
     draw_geometry(renderer, cmd_buf);
 
@@ -166,6 +169,16 @@ void draw_geometry(Renderer* renderer, VkCommandBuffer cmd_buf)
         .clearValue = clear_value,
     };
 
+    VkRenderingAttachmentInfo depth_attachment = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+        .pNext = NULL,
+        .imageView = renderer->depth_image.view,
+        .imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+        .clearValue.depthStencil.depth = 0,
+    };
+
     VkRenderingInfoKHR render_info = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
         .renderArea = {
@@ -177,6 +190,7 @@ void draw_geometry(Renderer* renderer, VkCommandBuffer cmd_buf)
         .viewMask = 0,
         .colorAttachmentCount = 1,
         .pColorAttachments = &colour_attachment,
+        .pDepthAttachment = &depth_attachment,
     };
 
 
@@ -189,8 +203,8 @@ void draw_geometry(Renderer* renderer, VkCommandBuffer cmd_buf)
     VkViewport viewport = {
         .x = 0,
         .y = 0,
-        .width = renderer->draw_image.extent.width,
-        .height = renderer->draw_image.extent.height,
+        .width = (float)renderer->draw_image.extent.width,
+        .height = (float)renderer->draw_image.extent.height,
 
         .minDepth = 0.f,
         .maxDepth = 1.f,
@@ -205,16 +219,28 @@ void draw_geometry(Renderer* renderer, VkCommandBuffer cmd_buf)
 
     vkCmdSetScissor(cmd_buf, 0, 1, &scissor);
 
+
+    VkExtent3D draw_extent = renderer->draw_image.extent;
+    vec3 translation = {renderer->translation[0], renderer->translation[1], renderer->translation[2]};
+    mat4 view = GLM_MAT4_IDENTITY_INIT;
+    mat4 world_matrix;
+    mat4 proj = {0};
+    glm_translate(view, translation);
+    glm_perspective(glm_rad(renderer->fov), 1.0, 10000, 0.1, proj);
+    proj[1][1] *= -1;
+
+    glm_mat4_mul(view, proj, world_matrix);
+
     PushConstants push_constants = {
-        .world_matrix = GLM_MAT4_IDENTITY_INIT,
-        .vertex_buffer = renderer->mesh.vertex_buffer_address,
+        .world_matrix = MAT4_UNPACK(world_matrix),
+        .vertex_buffer = renderer->mesh.mesh_buffers.vertex_buffer_address,
     };
 
     vkCmdPushConstants(cmd_buf, renderer->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
             sizeof(PushConstants), &push_constants);
-    vkCmdBindIndexBuffer(cmd_buf, renderer->mesh.index_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-    vkCmdDrawIndexed(cmd_buf, 9, 1, 0, 0, 0);
-    // vkCmdDraw(cmd_buf, 3, 1, 0, 0);
+    vkCmdBindIndexBuffer(cmd_buf, renderer->mesh.mesh_buffers.index_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdDrawIndexed(cmd_buf, renderer->mesh.surfaces[0].count, 1, renderer->mesh.surfaces[0].start_index, 0, 0);
+    // vkCmdDraw(cmd_buf, 102, 1, 0, 0);
 
     func = get_device_proc_adr(renderer->device, "vkCmdEndRenderingKHR");
     ((PFN_vkCmdEndRenderingKHR)(func))(cmd_buf);
@@ -399,19 +425,13 @@ void sync_cleanup(Renderer* renderer)
 
 void initialise_data(Renderer* renderer)
 {
-    const int n_vertices = 5;
-    Vertex vertices[n_vertices] = {
-        { .position = {0.5,-0.5, 0}, .colour = {0, 0, 1, 1} },
-        { .position = {0.5,0.5, 0}, .colour = {1, 0, 0, 1} },
-        { .position = {-0.5,-0.5, 0}, .colour = {0, 1, 0, 1} },
-        { .position = {-0.5,0.5, 0}, .colour = {0, 0, 1, 1} },
-        { .position = {0,0.9, 0}, .colour = {0, 0, 1, 1} },
-    };
+    // renderer->mesh = upload_mesh(renderer, indices, n_indices, vertices, n_vertices);
+    Mesh mesh = load_obj_meshes(renderer, "room.obj");
+    renderer->mesh = mesh;
 
-    const int n_indices = 9;
-    uint32_t indices[n_indices] = {0, 1, 2, 2, 1, 3, 3, 1, 4};
-
-    renderer->mesh = upload_mesh(renderer, indices, n_indices, vertices, n_vertices);
+    renderer->translation[0] = 0;
+    renderer->translation[1] = 0;
+    renderer->translation[1] = 0;
 }
 
 VkSubmitInfo get_submit_info(Renderer* renderer)

@@ -14,3 +14,9 @@
 [submodule "third_party/cgltf"]
 	path = third_party/cgltf
 	url = https://github.com/jkuhlmann/cgltf
+[submodule "third_party/tinyobjloader-c"]
+	path = third_party/tinyobjloader-c
+	url = https://github.com/syoyo/tinyobjloader-c
+[submodule "third_party/fast_obj"]
+	path = third_party/fast_obj
+	url = https://github.com/thisistherk/fast_obj

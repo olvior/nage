@@ -7,6 +7,7 @@
 #include <cglm/cglm.h>
 #include <vk_mem_alloc.h>
 
+
 typedef struct {
     vec3 position;
     float uv_x;
@@ -40,6 +41,19 @@ typedef struct {
     VkFormat format;
 } Image;
 
+typedef struct GeoSurface {
+    uint32_t start_index;
+    uint32_t count;
+} GeoSurface;
+
+typedef struct Mesh {
+    char* name;
+
+    int n_surfaces;
+    GeoSurface* surfaces;
+    MeshBuffers mesh_buffers;
+} Mesh;
+
 typedef struct {
     VkSwapchainKHR swapchain;
     VkExtent2D extent;
@@ -68,6 +82,7 @@ typedef struct {
     VkQueue graphics_queue;
 
     Image draw_image;
+    Image depth_image;
     VkExtent2D draw_extent;
     VkDescriptorSet draw_image_desc_set;
     VkDescriptorSetLayout draw_image_desc_layout;
@@ -84,7 +99,9 @@ typedef struct {
     VkFence imm_fence;
     VkDescriptorPool imgui_pool;
 
-    MeshBuffers mesh;
+    Mesh mesh;
+    vec3 translation;
+    float fov;
 
     int frame_in_flight;
     int frame;

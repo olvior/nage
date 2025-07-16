@@ -192,13 +192,13 @@ void create_pipeline(Renderer* renderer)
     pb.shader_stages[1] = frag_shader;
     pipeline_builder_set_input_topology(&pb, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
     pipeline_builder_set_polygon_mode(&pb, VK_POLYGON_MODE_FILL);
-    pipeline_builder_set_cull_mode(&pb, VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+    pipeline_builder_set_cull_mode(&pb, VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
     pipeline_builder_set_multisampling_none(&pb);
     pipeline_builder_disable_blending(&pb);
-    pipeline_builder_disable_depthtest(&pb);
+    pipeline_builder_set_depthtest(&pb, true, VK_COMPARE_OP_GREATER_OR_EQUAL);
 
     pipeline_builder_set_color_attachment_format(&pb, renderer->draw_image.format);
-    pipeline_builder_set_depth_format(&pb, VK_FORMAT_UNDEFINED);
+    pipeline_builder_set_depth_format(&pb, renderer->depth_image.format);
 
     renderer->pipeline = pipeline_builder_build(&pb, renderer->device);
 
@@ -348,11 +348,11 @@ void pipeline_builder_set_depth_format(PipelineBuilder* pb, VkFormat format)
     pb->rendering_info.depthAttachmentFormat = format;
 }
 
-void pipeline_builder_disable_depthtest(PipelineBuilder* pb)
+void pipeline_builder_set_depthtest(PipelineBuilder* pb, bool enable_depth_write, VkCompareOp op)
 {
-    pb->depth_stencil.depthTestEnable = VK_FALSE;
-    pb->depth_stencil.depthWriteEnable = VK_FALSE;
-    pb->depth_stencil.depthCompareOp = VK_COMPARE_OP_NEVER;
+    pb->depth_stencil.depthTestEnable = VK_TRUE;
+    pb->depth_stencil.depthWriteEnable = enable_depth_write;
+    pb->depth_stencil.depthCompareOp = op;
     pb->depth_stencil.depthBoundsTestEnable = VK_FALSE;
     pb->depth_stencil.stencilTestEnable = VK_FALSE;
     pb->depth_stencil.minDepthBounds = 0.f;

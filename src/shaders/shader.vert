@@ -29,7 +29,7 @@ void main()
 
 
     //output the position of each vertex
-    gl_Position = PushConstants.render_matrix * vec4(v.position, 1.0f);
+    gl_Position = PushConstants.render_matrix * vec4(v.position, 1);
 
     outColor = v.color.xyz;
     outUV.x = v.uv_x;

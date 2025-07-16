@@ -1,5 +1,6 @@
 #include "engine.h"
 #include "utils.h"
+#include "scene/loader.h"
 
 #include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
@@ -14,6 +15,10 @@ void engine_initialise(Engine* engine)
     window_initialise(&engine->window);
     renderer_initialise(&engine->renderer, engine->window.window);
     imgui_initialise(&engine->renderer, engine->window.window, &engine->io);
+
+    // renderer->mesh = upload_mesh(renderer, indices, n_indices, vertices, n_vertices);
+    // Mesh* meshes = load_glft_meshes(&engine->renderer, "basicmesh.glb");
+    // renderer->mesh = meshes[0].mesh_buffers;
 }
 
 void engine_run(Engine* engine)

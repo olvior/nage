@@ -25,4 +25,5 @@ VkSurfaceFormatKHR choose_swap_surface_format(SwapChainSupportDetails* details);
 VkPresentModeKHR choose_swap_present_mode(SwapChainSupportDetails* details);
 VkExtent2D choose_swap_extent(GLFWwindow* window, VkSurfaceCapabilitiesKHR* capabilities);
 void create_drawing_image(Renderer* renderer);
+void create_depth_image(Renderer* renderer);
 

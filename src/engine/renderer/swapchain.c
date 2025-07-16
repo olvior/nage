@@ -8,6 +8,7 @@ void swapchain_initialise(Renderer* renderer, GLFWwindow* window)
     create_swap_chain(renderer, window);
     create_image_views(renderer);
     create_drawing_image(renderer);
+    create_depth_image(renderer);
 }
 
 void swapchain_cleanup(Renderer* renderer)
@@ -16,6 +17,8 @@ void swapchain_cleanup(Renderer* renderer)
 
     vkDestroyImageView(renderer->device, renderer->draw_image.view, NULL);
     vmaDestroyImage(renderer->allocator, renderer->draw_image.image, renderer->draw_image.allocation);
+    vkDestroyImageView(renderer->device, renderer->depth_image.view, NULL);
+    vmaDestroyImage(renderer->allocator, renderer->depth_image.image, renderer->depth_image.allocation);
 
 
     for (int i = 0; i < swapchain->image_count; ++i)
@@ -174,6 +177,7 @@ VkPresentModeKHR choose_swap_present_mode(SwapChainSupportDetails* details)
     {
         VkPresentModeKHR m = details->present_modes[i];
         if (m == VK_PRESENT_MODE_MAILBOX_KHR)
+        // if (m == VK_PRESENT_MODE_IMMEDIATE_KHR)
             return m;
     }
 
@@ -273,3 +277,26 @@ void create_drawing_image(Renderer* renderer)
 
 }
 
+void create_depth_image(Renderer* renderer)
+{
+    renderer->depth_image.format = VK_FORMAT_D32_SFLOAT;
+    renderer->depth_image.extent = renderer->draw_image.extent;
+
+    VkImageUsageFlags usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+    VkImageCreateInfo depth_img_info = get_image_create_info(renderer->depth_image.format, usage,
+            renderer->depth_image.extent);
+
+    VmaAllocationCreateInfo image_alloc_info = {
+        .usage = VMA_MEMORY_USAGE_GPU_ONLY,
+        .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    };
+
+    vmaCreateImage(renderer->allocator, &depth_img_info, &image_alloc_info, &renderer->depth_image.image,
+            &renderer->depth_image.allocation, NULL);
+
+    VkImageViewCreateInfo image_view_info = get_image_view_create_info(renderer->depth_image.format,
+            renderer->depth_image.image, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+    VK_CHECK(vkCreateImageView(renderer->device, &image_view_info, NULL, &renderer->depth_image.view));
+}

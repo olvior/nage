@@ -8,7 +8,7 @@ BUILD_DIR = bin
 SRC_DIR = src
 SHADER_DIR = src/shaders
 RUNTIME_DIR = out
-TARGET = vk_engine
+TARGET = nage
 
 # Finds all the c files in 1, 2, and 3 lvl directories $(SRC_DIR)
 SRCS = $(wildcard $(SRC_DIR)/*.c)
