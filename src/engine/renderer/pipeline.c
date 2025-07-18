@@ -36,8 +36,18 @@ void pipeline_cleanup(Renderer* renderer)
     vkDestroyPipeline(renderer->device, renderer->pipeline, NULL);
     vkDestroyPipelineLayout(renderer->device, renderer->pipeline_layout, NULL);
 
+    for (int i = 0; i < FRAMES_IN_FLIGHT; ++i)
+    {
+        descriptor_allocator_growable_destroy_pools(&renderer->frame_descriptors[i], renderer->device);
+        descriptor_allocator_growable_free_lists(&renderer->frame_descriptors[i]);
+    }
+
+
+
     destroy_pool(renderer->descriptor_pool, renderer->device);
     vkDestroyDescriptorSetLayout(renderer->device, renderer->draw_image_desc_layout, NULL);
+    vkDestroyDescriptorSetLayout(renderer->device, renderer->scene_data_desc_set_layout, NULL);
+    vkDestroyDescriptorSetLayout(renderer->device, renderer->single_image_desc_layout, NULL);
 }
 
 void descriptors_initialise(Renderer* renderer)
@@ -50,36 +60,54 @@ void descriptors_initialise(Renderer* renderer)
     VkDescriptorSetLayoutBinding bindings[] = {
         {
             .binding = 0,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .descriptorCount = 1,
         }
     };
 
-    renderer->draw_image_desc_layout = create_descriptor_set_layout(bindings, 1,
-            renderer->device, VK_SHADER_STAGE_COMPUTE_BIT, 0);
+    renderer->single_image_desc_layout = create_descriptor_set_layout(bindings, 1,
+            renderer->device, VK_SHADER_STAGE_FRAGMENT_BIT, 0);
 
     // allocate descriptor
+    // renderer->single_image_desc_layout = create_descriptor_set_layout(bindings, 1,
+    //         renderer->device, VK_SHADER_STAGE_FRAGMENT_BIT, 0);
+    //
+    // renderer->draw_image_desc_set = allocate_descriptor_set(renderer->descriptor_pool,
+    //         renderer->device, renderer->draw_image_desc_layout);
 
-    renderer->draw_image_desc_set = allocate_descriptor_set(renderer->descriptor_pool,
-            renderer->device, renderer->draw_image_desc_layout);
 
-    VkDescriptorImageInfo image_info = {
-        .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
-        .imageView = renderer->draw_image.view,
+    // VkDescriptorImageInfo image_info = descriptor_writer_get_image_info(renderer->draw_image.view,
+    //         VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL);
+    // VkWriteDescriptorSet write_info = descriptor_writer_get_write(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+    //         NULL, &image_info);
+    // descriptor_writer_update_set(renderer->device, renderer->draw_image_desc_set, &write_info, 1);
+
+
+    for (int i = 0; i < FRAMES_IN_FLIGHT; ++i)
+    {
+        DescriptorAllocatorGrowable* dag = &renderer->frame_descriptors[i];
+        descriptor_allocator_growable_alloc_lists(dag);
+        dag->ratios[0] = (VkDescriptorPoolSize) { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3 };
+		dag->ratios[1] = (VkDescriptorPoolSize) { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3 };
+		dag->ratios[2] = (VkDescriptorPoolSize) { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
+		dag->ratios[3] = (VkDescriptorPoolSize) { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4 };
+        dag->n_ratios = 4;
+        dag->sets_per_pool = 1000;
+
+        descriptor_allocator_growable_init(dag, renderer->device);
+    }
+
+    // scene data
+    VkDescriptorSetLayoutBinding scene_bindings[] = {
+        {
+            .binding = 0,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount = 1,
+        }
     };
 
-    VkWriteDescriptorSet draw_image_write = {
-        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-        .pNext = NULL,
-
-        .dstBinding = 0,
-        .dstSet = renderer->draw_image_desc_set,
-        .descriptorCount = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-        .pImageInfo = &image_info,
-    };
-
-    vkUpdateDescriptorSets(renderer->device, 1, &draw_image_write, 0, NULL);
+    renderer->scene_data_desc_set_layout = create_descriptor_set_layout(scene_bindings, 1,
+            renderer->device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0);
 }
 
 VkDescriptorSetLayout create_descriptor_set_layout(VkDescriptorSetLayoutBinding* bindings,
@@ -157,6 +185,190 @@ VkDescriptorSet allocate_descriptor_set(VkDescriptorPool pool, VkDevice device,
     return descriptor_set;
 }
 
+void descriptor_allocator_growable_alloc_lists(DescriptorAllocatorGrowable* dag)
+{
+    const uint16_t default_size = 20;
+    dag->ratios = malloc(sizeof(VkDescriptorPoolSize) * default_size);
+    dag->full_pools = malloc(sizeof(VkDescriptorPool) * default_size);
+    dag->ready_pools = malloc(sizeof(VkDescriptorPool) * default_size);
+
+    dag->n_ratios = 0;
+    dag->n_full_pools = 0;
+    dag->n_ready_pools = 0;
+}
+
+void descriptor_allocator_growable_free_lists(DescriptorAllocatorGrowable* dag)
+{
+    free(dag->ratios);
+    free(dag->full_pools);
+    free(dag->ready_pools);
+}
+
+VkDescriptorPool descriptor_allocator_growable_create_pool(DescriptorAllocatorGrowable* dag,
+        VkDevice device)
+{
+    VkDescriptorPoolSize pool_sizes[dag->n_ratios];
+    for (int i = 0; i < dag->n_ratios; ++i)
+    {
+        pool_sizes[i].type = dag->ratios[i].type;
+        pool_sizes[i].descriptorCount = dag->ratios[i].descriptorCount * dag->sets_per_pool;
+    }
+
+    VkDescriptorPoolCreateInfo pool_create_info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .flags = 0,
+        .maxSets = dag->sets_per_pool,
+        .poolSizeCount = dag->n_ratios,
+        .pPoolSizes = pool_sizes,
+    };
+
+    VkDescriptorPool new_pool;
+    vkCreateDescriptorPool(device, &pool_create_info, NULL, &new_pool);
+
+    return new_pool;
+}
+
+VkDescriptorPool descriptor_allocator_growable_get_pool(DescriptorAllocatorGrowable* dag,
+        VkDevice device)
+{
+    VkDescriptorPool new_pool;
+
+    if (dag->n_ready_pools != 0)
+    {
+        new_pool = dag->ready_pools[dag->n_ready_pools - 1];
+        dag->n_ready_pools -= 1;
+    }
+    else
+    {
+        new_pool = descriptor_allocator_growable_create_pool(dag, device);
+
+        dag->sets_per_pool *= 2;
+        if (dag->sets_per_pool > 4092)
+            dag->sets_per_pool = 4092;
+    }
+
+    return new_pool;
+}
+
+void descriptor_allocator_growable_init(DescriptorAllocatorGrowable* dag, VkDevice device)
+{
+    VkDescriptorPool new_pool = descriptor_allocator_growable_create_pool(dag, device);
+    dag->sets_per_pool *= 2;
+
+    dag->ready_pools[dag->n_ready_pools] = new_pool;
+    dag->n_ready_pools += 1;
+}
+
+void descriptor_allocator_growable_clear_pools(DescriptorAllocatorGrowable* dag, VkDevice device)
+{
+    for (int i = 0; i < dag->n_ready_pools; ++i)
+        vkResetDescriptorPool(device, dag->ready_pools[i], 0);
+
+    for (int i = 0; i < dag->n_full_pools; ++i)
+    {
+        vkResetDescriptorPool(device, dag->full_pools[i], 0);
+        dag->ready_pools[dag->n_ready_pools] = dag->full_pools[i];
+        dag->n_full_pools -= 1;
+    }
+}
+
+void descriptor_allocator_growable_destroy_pools(DescriptorAllocatorGrowable* dag, VkDevice device)
+{
+    for (int i = 0; i < dag->n_ready_pools; ++i)
+        vkDestroyDescriptorPool(device, dag->ready_pools[i], 0);
+
+    for (int i = 0; i < dag->n_full_pools; ++i)
+        vkDestroyDescriptorPool(device, dag->full_pools[i], 0);
+
+    dag->n_ready_pools = 0;
+    dag->n_full_pools = 0;
+}
+
+VkDescriptorSet descriptor_allocator_growable_allocate(DescriptorAllocatorGrowable* dag,
+        VkDevice device, VkDescriptorSetLayout layout, void* pNext)
+{
+    VkDescriptorPool pool_to_use = descriptor_allocator_growable_get_pool(dag, device);
+
+    VkDescriptorSetAllocateInfo alloc_info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .pNext = pNext,
+
+        .descriptorPool = pool_to_use,
+        .descriptorSetCount = 1,
+        .pSetLayouts = &layout,
+    };
+
+    VkDescriptorSet desc_set;
+    VkResult e = vkAllocateDescriptorSets(device, &alloc_info, &desc_set);
+
+    if (e == VK_ERROR_OUT_OF_POOL_MEMORY || e == VK_ERROR_FRAGMENTED_POOL)
+    {
+        dag->full_pools[dag->n_full_pools] = pool_to_use;
+        dag->n_full_pools += 1;
+
+        pool_to_use = descriptor_allocator_growable_get_pool(dag, device);
+        VK_CHECK(vkAllocateDescriptorSets(device, &alloc_info, &desc_set));
+    }
+
+    dag->ready_pools[dag->n_ready_pools] = pool_to_use;
+    dag->n_ready_pools += 1;
+
+    return desc_set;
+}
+
+VkDescriptorBufferInfo descriptor_writer_get_buffer_info(VkBuffer buffer, size_t size, size_t offset)
+{
+    VkDescriptorBufferInfo info = {
+        .buffer = buffer,
+        .offset = offset,
+		.range = size,
+    };
+
+    return info;
+}
+
+VkDescriptorImageInfo descriptor_writer_get_image_info(VkImageView image_view, VkSampler sampler,
+        VkImageLayout layout)
+{
+    VkDescriptorImageInfo info = {
+        .sampler = sampler,
+        .imageView = image_view,
+        .imageLayout = layout,
+    };
+
+    return info;
+}
+
+VkWriteDescriptorSet descriptor_writer_get_write(int binding, VkDescriptorType type,
+        VkDescriptorBufferInfo* buffer_info, VkDescriptorImageInfo* image_info)
+{
+    VkWriteDescriptorSet write = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .dstBinding = binding,
+        .dstSet = VK_NULL_HANDLE, // null for now
+        .descriptorCount = 1,
+        .descriptorType = type,
+    };
+
+    if (buffer_info != NULL)
+        write.pBufferInfo = buffer_info;
+    else if (image_info != NULL)
+        write.pImageInfo = image_info;
+    else
+        FATAL("Could not setup descriptor write info\n");
+
+    return write;
+}
+
+void descriptor_writer_update_set(VkDevice device, VkDescriptorSet set,
+        VkWriteDescriptorSet* write_sets, int n_write_sets)
+{
+    for (int i = 0; i < n_write_sets; ++i)
+        write_sets[i].dstSet = set;
+
+    vkUpdateDescriptorSets(device, n_write_sets, write_sets, 0, NULL);
+}
+
 void create_pipeline_layout(Renderer* renderer)
 {
     VkPushConstantRange push_constant = {
@@ -168,7 +380,7 @@ void create_pipeline_layout(Renderer* renderer)
     VkPipelineLayoutCreateInfo pipeline_layout = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .pNext = NULL,
-        .pSetLayouts = &renderer->draw_image_desc_layout,
+        .pSetLayouts = &renderer->single_image_desc_layout,
         .setLayoutCount = 1,
 
         .pushConstantRangeCount = 1,

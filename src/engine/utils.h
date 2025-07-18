@@ -16,8 +16,10 @@
 #define ANSI_RED 31
 #define ANSI_YELLOW 33
 
+#define max(a, b) a > b ? a : b
+
 // interesting set of macros
-#define VK_CHECK(x)                             \
+#define VK_CHECK(x)                                   \
     do {                                              \
         if (x)                                        \
             FATAL("VULKAN %s\n", string_VkResult(x)); \

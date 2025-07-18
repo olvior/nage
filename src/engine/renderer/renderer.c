@@ -14,6 +14,8 @@
 
 // #include <math.h>
 
+#define M_I 2
+
 const int VALIDATION_LAYERS_COUNT = 1;
 const char* VALIDATION_LAYERS[VALIDATION_LAYERS_COUNT] = {
     "VK_LAYER_KHRONOS_validation",
@@ -56,8 +58,11 @@ void renderer_initialise(Renderer* renderer, GLFWwindow* window)
 
 void renderer_cleanup(Renderer* renderer)
 {
-    buffer_destroy(&renderer->mesh.mesh_buffers.index_buffer, renderer->allocator);
-    buffer_destroy(&renderer->mesh.mesh_buffers.vertex_buffer, renderer->allocator);
+    vkDestroySampler(renderer->device, renderer->sampler_nearest, NULL);
+    vkDestroySampler(renderer->device, renderer->sampler_linear, NULL);
+    image_destroy(renderer->device, renderer->allocator, renderer->error_image);
+
+    meshes_destroy(renderer->meshes, renderer->n_meshes, renderer->allocator);
 
     pipeline_cleanup(renderer);
 
@@ -77,6 +82,8 @@ void renderer_draw(Renderer* renderer)
 
     // first we wait
     VK_CHECK(vkWaitForFences(renderer->device, 1, &renderer->fences[frame], true, ONE_SEC));
+
+    descriptor_allocator_growable_clear_pools(&renderer->frame_descriptors[frame], renderer->device);
 
     VK_CHECK(vkResetFences(renderer->device, 1, &renderer->fences[frame]));
 
@@ -174,9 +181,7 @@ void renderer_draw(Renderer* renderer)
 
 void draw_geometry(Renderer* renderer, VkCommandBuffer cmd_buf)
 {
-    VkClearValue clear_value = {
-        .color = { {0.1f, 0.2f, 0.3f, 1.0f} }
-    };
+    VkClearValue clear_value = { .color = { {0.1f, 0.2f, 0.3f, 1.0f} } };
     VkRenderingAttachmentInfoKHR colour_attachment = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
         .pNext = NULL,
@@ -211,7 +216,41 @@ void draw_geometry(Renderer* renderer, VkCommandBuffer cmd_buf)
         .pDepthAttachment = &depth_attachment,
     };
 
+    Buffer scene_data_buffer = buffer_create(renderer->allocator, sizeof(GPUSceneData),
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
+    // copy data to gpu
+    void* data;
+    vmaMapMemory(renderer->allocator, scene_data_buffer.allocation, &data);
+    memcpy(data, &renderer->scene_data, sizeof(GPUSceneData));
+    vmaUnmapMemory(renderer->allocator, scene_data_buffer.allocation);
+
+    // uniform buffer
+    VkDescriptorSet global_descriptor = descriptor_allocator_growable_allocate(
+            &renderer->frame_descriptors[renderer->frame_in_flight], renderer->device,
+            renderer->scene_data_desc_set_layout, NULL);
+
+    VkDescriptorBufferInfo buffer_info = descriptor_writer_get_buffer_info(scene_data_buffer.buffer,
+            sizeof(GPUSceneData), 0);
+    VkWriteDescriptorSet write_info = descriptor_writer_get_write(0,
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, &buffer_info, NULL);
+    descriptor_writer_update_set(renderer->device, global_descriptor, &write_info, 1);
+
+    // image descriptor
+    VkDescriptorSet image_set = descriptor_allocator_growable_allocate(
+            &renderer->frame_descriptors[renderer->frame_in_flight], renderer->device,
+            renderer->single_image_desc_layout, NULL);
+
+    VkDescriptorImageInfo image_info = descriptor_writer_get_image_info(renderer->error_image.view,
+            renderer->sampler_nearest, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    write_info = descriptor_writer_get_write(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            NULL, &image_info);
+    descriptor_writer_update_set(renderer->device, image_set, &write_info, 1);
+
+    vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer->pipeline_layout, 0,
+            1, &image_set, 0, NULL);
+
+    // begin rendering
     void* func = get_device_proc_adr(renderer->device, "vkCmdBeginRenderingKHR");
     ((PFN_vkCmdBeginRenderingKHR)(func))(cmd_buf, &render_info);
 
@@ -264,17 +303,19 @@ void draw_geometry(Renderer* renderer, VkCommandBuffer cmd_buf)
 
     PushConstants push_constants = {
         .world_matrix = MAT4_UNPACK(mvp),
-        .vertex_buffer = renderer->mesh.mesh_buffers.vertex_buffer_address,
+        .vertex_buffer = renderer->meshes[M_I].mesh_buffers.vertex_buffer_address,
     };
 
     vkCmdPushConstants(cmd_buf, renderer->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
             sizeof(PushConstants), &push_constants);
-    vkCmdBindIndexBuffer(cmd_buf, renderer->mesh.mesh_buffers.index_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-    vkCmdDrawIndexed(cmd_buf, renderer->mesh.surfaces[0].count, 1, renderer->mesh.surfaces[0].start_index, 0, 0);
+    vkCmdBindIndexBuffer(cmd_buf, renderer->meshes[M_I].mesh_buffers.index_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdDrawIndexed(cmd_buf, renderer->meshes[M_I].surfaces[0].count, 1, renderer->meshes[M_I].surfaces[0].start_index, 0, 0);
     // vkCmdDraw(cmd_buf, 102, 1, 0, 0);
 
     func = get_device_proc_adr(renderer->device, "vkCmdEndRenderingKHR");
     ((PFN_vkCmdEndRenderingKHR)(func))(cmd_buf);
+
+    buffer_destroy(&scene_data_buffer, renderer->allocator);
 }
 
 void renderer_create_instance(Renderer* renderer)
@@ -457,13 +498,35 @@ void sync_cleanup(Renderer* renderer)
 void initialise_data(Renderer* renderer)
 {
     // renderer->mesh = upload_mesh(renderer, indices, n_indices, vertices, n_vertices);
-    Mesh* meshes = load_glft_meshes(renderer, "basicmesh.glb");
-    renderer->mesh = meshes[2];
-
     renderer->translation[0] = 0;
     renderer->translation[1] = 0;
     renderer->translation[1] = 0;
     renderer->fov = 90;
+
+    uint32_t checkerboard[16*16];
+    for (int x = 0; x < 16; ++x)
+    {
+        for (int y = 0; y < 16; ++y)
+        {
+            checkerboard[16 * y + x] = ((x % 2) ^ (y % 2)) ? 0xffff0000 : 0x00000000;
+        }
+    }
+    renderer->error_image = image_create_textured(renderer, &checkerboard,
+            (VkExtent3D) { 16, 16, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+
+    VkSamplerCreateInfo sampler_info = {
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .magFilter = VK_FILTER_NEAREST,
+        .minFilter = VK_FILTER_NEAREST
+    };
+    vkCreateSampler(renderer->device, &sampler_info, NULL, &renderer->sampler_nearest);
+
+    VkSamplerCreateInfo sampler2_info = {
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .magFilter = VK_FILTER_LINEAR,
+        .minFilter = VK_FILTER_LINEAR
+    };
+    vkCreateSampler(renderer->device, &sampler2_info, NULL, &renderer->sampler_linear);
 }
 
 VkSubmitInfo get_submit_info(Renderer* renderer)

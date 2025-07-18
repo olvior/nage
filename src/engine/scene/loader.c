@@ -24,7 +24,7 @@ static void ReleaseFileGLTFCallback(const struct cgltf_memory_options *memoryOpt
     free(data);
 }
 
-Mesh* load_glft_meshes(Renderer* renderer, char* file_path)
+Mesh* load_glft_meshes(Renderer* renderer, char* file_path, int* out_n)
 {
     LOG_V("Loading GLTF %s\n", file_path);
 
@@ -42,6 +42,7 @@ Mesh* load_glft_meshes(Renderer* renderer, char* file_path)
     result = cgltf_load_buffers(&options, data, file_path);
 
     Mesh* meshes = malloc(sizeof(Mesh) * data->meshes_count);
+    *out_n = data->meshes_count;
 
     for (int i = 0; i < data->meshes_count; ++i)
     {
@@ -193,8 +194,15 @@ Mesh load_obj_mesh(Renderer* renderer, char* file_path)
 }
 
 
-void free_mesh(Mesh* mesh)
+void meshes_destroy(Mesh* meshes, int n, VmaAllocator allocator)
 {
-    free(mesh->surfaces);
+    for (int i = 0; i < n; ++i)
+    {
+        buffer_destroy(&meshes[i].mesh_buffers.index_buffer, allocator);
+        buffer_destroy(&meshes[i].mesh_buffers.vertex_buffer, allocator);
+
+        free(meshes[i].surfaces);
+    }
+    free(meshes);
 }
 

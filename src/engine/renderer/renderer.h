@@ -17,6 +17,15 @@ typedef struct {
 } Vertex;
 
 typedef struct {
+    mat4 proj;
+    mat4 view;
+    mat4 view_proj;
+    vec4 ambient_colour;
+    vec4 sunlight_direction; // [3] is for sun power
+    vec4 sunlight_colour;
+} GPUSceneData;
+
+typedef struct {
     mat4 world_matrix;
     VkDeviceAddress vertex_buffer;
 } PushConstants;
@@ -53,6 +62,23 @@ typedef struct Mesh {
     GeoSurface* surfaces;
     MeshBuffers mesh_buffers;
 } Mesh;
+
+typedef struct {
+    VkDescriptorPoolSize* ratios;
+    VkDescriptorPool* full_pools;
+    VkDescriptorPool* ready_pools;
+
+    uint16_t n_ratios;
+    uint16_t n_full_pools;
+    uint16_t n_ready_pools;
+    uint16_t sets_per_pool;
+
+    uint16_t max_capacity;
+} DescriptorAllocatorGrowable;
+
+typedef struct {
+} DescriptorWriter;
+
 
 typedef struct {
     VkSwapchainKHR swapchain;
@@ -94,21 +120,32 @@ typedef struct {
     VkSemaphore semaphores_render[FRAMES_IN_FLIGHT];
     VkFence fences[FRAMES_IN_FLIGHT];
 
+    DescriptorAllocatorGrowable frame_descriptors[FRAMES_IN_FLIGHT];
+
     VkCommandPool imm_cmd_pool;
     VkCommandBuffer imm_cmd_buf;
     VkFence imm_fence;
-    Image imgui_image;
     VkDescriptorPool imgui_pool;
 
-    Mesh mesh;
+    GPUSceneData scene_data;
+    VkDescriptorSetLayout scene_data_desc_set_layout;
+    VkDescriptorSetLayout single_image_desc_layout;
+
+    VkSampler sampler_nearest;
+    VkSampler sampler_linear;
+    Image error_image;
+
+    Mesh* meshes;
     vec3 translation;
     float fov;
+    int n_meshes;
 
     int frame_in_flight;
     int frame;
 
     bool resize_requested;
 } Renderer;
+
 
 
 void renderer_initialise(Renderer* renderer, GLFWwindow* window);

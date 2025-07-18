@@ -1,5 +1,6 @@
 #include "swapchain.h"
 #include "image.h"
+#include "pipeline.h"
 #include <vk_mem_alloc.h>
 #include "../utils.h"
 
@@ -191,8 +192,8 @@ VkPresentModeKHR choose_swap_present_mode(SwapChainSupportDetails* details)
     for (int i = 0; i < details->present_mode_count; ++i)
     {
         VkPresentModeKHR m = details->present_modes[i];
-        // if (m == VK_PRESENT_MODE_MAILBOX_KHR)
-        if (m == VK_PRESENT_MODE_IMMEDIATE_KHR)
+        if (m == VK_PRESENT_MODE_MAILBOX_KHR)
+        // if (m == VK_PRESENT_MODE_IMMEDIATE_KHR)
             return m;
     }
 
@@ -315,3 +316,4 @@ void create_depth_image(Renderer* renderer)
 
     VK_CHECK(vkCreateImageView(renderer->device, &image_view_info, NULL, &renderer->depth_image.view));
 }
+
