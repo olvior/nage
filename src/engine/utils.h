@@ -76,6 +76,8 @@
 
 #define MAT4_FSTR(m) "%f\t%f\t%f\t%f\n%f\t%f\t%f\t%f\n%f\t%f\t%f\t%f\n%f\t%f\t%f\t%f\n", m[0][0], m[0][1], m[0][2], m[0][3], m[1][0], m[1][1], m[1][2], m[1][3], m[2][0], m[2][1], m[2][2], m[2][3], m[3][0], m[3][1], m[3][2], m[3][3]
 
+
+
 typedef struct {
     uint32_t graphics_family;
     uint32_t present_family;
@@ -86,7 +88,7 @@ typedef struct {
     char* buf;
 } File;
 
-File read_file(char path[]);
+File read_file(const char path[]);
 
 void print_string_list(const char* b[], int n);
 uint32_t clamp(uint32_t a, uint32_t min, uint32_t max);

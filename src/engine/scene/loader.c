@@ -24,7 +24,7 @@ static void ReleaseFileGLTFCallback(const struct cgltf_memory_options *memoryOpt
     free(data);
 }
 
-Mesh* load_glft_meshes(Renderer* renderer, char* file_path, int* out_n)
+Mesh* load_glft_meshes(Renderer* renderer, char* file_path, uint8_t* out_n)
 {
     LOG_V("Loading GLTF %s\n", file_path);
 
@@ -50,13 +50,18 @@ Mesh* load_glft_meshes(Renderer* renderer, char* file_path, int* out_n)
         cgltf_mesh gltf_mesh = data->meshes[i];
         Mesh new_mesh = {0};
 
-        new_mesh.name = gltf_mesh.name;
+        new_mesh.name = malloc(sizeof(char) * strlen(gltf_mesh.name));
+        memcpy(new_mesh.name, gltf_mesh.name, sizeof(char) * strlen(gltf_mesh.name));
+        // TODO: free this
+        printf("%s name it is\n", new_mesh.name);
         new_mesh.surfaces = malloc(sizeof(GeoSurface) * gltf_mesh.primitives_count);
+        new_mesh.n_surfaces = gltf_mesh.primitives_count;
 
         uint32_t index_count = 0;
-        uint32_t indices[9999];
         uint32_t vertex_count = 0;
-        Vertex vertices[9999];
+        // temporary max size
+        uint32_t indices[29999];
+        Vertex vertices[29999];
         int extra_vertices_found = 0;
 
         for (int j = 0; j < gltf_mesh.primitives_count; ++j)
@@ -77,6 +82,7 @@ Mesh* load_glft_meshes(Renderer* renderer, char* file_path, int* out_n)
             // loading the indices
             int primitive_index_count = cgltf_accessor_unpack_indices(primitive.indices, NULL, 4, 0);
 
+            LOG_V("Loading indices %d\n", primitive_index_count);
             cgltf_accessor_unpack_indices(primitive.indices, indices + index_count,
                     4, primitive_index_count);
 
@@ -125,6 +131,7 @@ Mesh* load_glft_meshes(Renderer* renderer, char* file_path, int* out_n)
                 }
                 if (primitive.attributes[a].type == cgltf_attribute_type_color)
                 {
+                    LOG_V("Loading colour data!");
                     cgltf_accessor* attribute = primitive.attributes[a].data;
                     int primitive_colour_count = cgltf_accessor_unpack_floats(attribute, NULL, 0);
                     float raw_floats[primitive_colour_count * 3 + 10];
@@ -134,6 +141,20 @@ Mesh* load_glft_meshes(Renderer* renderer, char* file_path, int* out_n)
                         vertices[vertex_count + b].colour[0] = raw_floats[b * 3];
                         vertices[vertex_count + b].colour[1] = raw_floats[b * 3 + 1];
                         vertices[vertex_count + b].colour[2] = raw_floats[b * 3 + 2];
+                    }
+                }
+                if (primitive.attributes[a].type == cgltf_attribute_type_normal)
+                {
+                    LOG_V("Loading normal data!");
+                    cgltf_accessor* attribute = primitive.attributes[a].data;
+                    int primitive_normal_count = cgltf_accessor_unpack_floats(attribute, NULL, 0);
+                    float raw_floats[primitive_normal_count * 3 + 10];
+                    int success = cgltf_accessor_unpack_floats(attribute, raw_floats, primitive_normal_count * 3);
+                    for (int b = 0; b < primitive_normal_count; ++b)
+                    {
+                        vertices[vertex_count + b].normal[0] = raw_floats[b * 3];
+                        vertices[vertex_count + b].normal[1] = raw_floats[b * 3 + 1];
+                        vertices[vertex_count + b].normal[2] = raw_floats[b * 3 + 2];
                     }
                 }
             }
@@ -202,6 +223,7 @@ void meshes_destroy(Mesh* meshes, int n, VmaAllocator allocator)
         buffer_destroy(&meshes[i].mesh_buffers.vertex_buffer, allocator);
 
         free(meshes[i].surfaces);
+        free(meshes[i].name);
     }
     free(meshes);
 }

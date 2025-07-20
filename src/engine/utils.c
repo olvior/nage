@@ -1,7 +1,8 @@
 #include "utils.h"
+#include <execinfo.h>
 
 // please free after :)
-File read_file(char path[])
+File read_file(const char path[])
 {
     FILE* fp = fopen(path, "rb");
 
@@ -83,3 +84,4 @@ void* get_device_proc_adr(VkDevice device, char name[])
 
     return func;
 }
+

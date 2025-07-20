@@ -2,6 +2,22 @@
 
 #include "renderer.h"
 
+#define SHADER_STAGES 2
+
+typedef struct PipelineBuilder {
+    VkPipelineLayout layout;
+
+    VkPipelineShaderStageCreateInfo shader_stages[SHADER_STAGES];
+    VkPipelineInputAssemblyStateCreateInfo input_assembly;
+    VkPipelineRasterizationStateCreateInfo rasteriser;
+    VkPipelineColorBlendAttachmentState colour_blend_attachment;
+    VkPipelineMultisampleStateCreateInfo multisampling;
+    VkPipelineLayout pipeline_layout;
+    VkPipelineDepthStencilStateCreateInfo depth_stencil;
+    VkPipelineRenderingCreateInfo rendering_info;
+    VkFormat colour_attachment_format;
+} PipelineBuilder;
+
 void pipeline_initialise(Renderer* renderer);
 void pipeline_cleanup(Renderer* renderer);
 
@@ -18,7 +34,7 @@ void descriptor_allocator_growable_destroy_pools(DescriptorAllocatorGrowable* da
 VkDescriptorSet descriptor_allocator_growable_allocate(DescriptorAllocatorGrowable* dag,
         VkDevice device, VkDescriptorSetLayout layout, void* pNext);
 
-// internal
+// descriptor helpers
 VkDescriptorSetLayout create_descriptor_set_layout(VkDescriptorSetLayoutBinding* bindings,
         int n, VkDevice device, VkShaderStageFlags shader_stages,
         VkDescriptorSetLayoutCreateFlags flags);
@@ -34,8 +50,6 @@ void destroy_pool(VkDescriptorPool pool, VkDevice device);
 void descriptors_initialise(Renderer* renderer);
 void create_pipeline_layout(Renderer* renderer);
 void create_pipeline(Renderer* renderer);
-
-typedef struct PipelineBuilder PipelineBuilder;
 
 void pipeline_builder_clear(PipelineBuilder* pb);
 VkPipeline pipeline_builder_build(PipelineBuilder* pb, VkDevice device);

@@ -17,9 +17,19 @@ void engine_initialise(Engine* engine)
     renderer_initialise(&engine->renderer, engine->window.window);
     imgui_initialise(&engine->renderer, engine->window.window, &engine->io);
 
+    ecs_intitialise(&engine->ecs);
     // renderer->mesh = upload_mesh(renderer, indices, n_indices, vertices, n_vertices);
+    uint8_t n_meshes;
     engine->renderer.meshes = load_glft_meshes(&engine->renderer, "basicmesh.glb",
             &engine->renderer.n_meshes);
+    // Mesh* meshes = load_glft_meshes(&engine->renderer, "basicmesh.glb", &n_meshes);
+    Mesh* meshes = engine->renderer.meshes;
+    mat4 transform = GLM_MAT4_IDENTITY_INIT;
+    ecs_add_renderable(&engine->ecs, &meshes[0], transform);
+    glm_translate(transform, (vec4){ 4, 0, 0, 0 });
+    ecs_add_renderable(&engine->ecs, &meshes[1], transform);
+    glm_translate(transform, (vec4){ -8, 0, 2, 0 });
+    ecs_add_renderable(&engine->ecs, &meshes[2], transform);
     // renderer->mesh = meshes[0].mesh_buffers;
 }
 
@@ -50,7 +60,10 @@ void engine_run(Engine* engine)
 
         imgui_frame(engine->io, &engine->renderer);
 
-        renderer_draw(&engine->renderer);
+        RenderObject opaque_surfaces[10] = {0};
+        DrawContext context = {opaque_surfaces, 0};
+        ecs_renderable_collect(&engine->ecs, &engine->renderer, &context);
+        renderer_draw(&engine->renderer, &context);
     }
 }
 

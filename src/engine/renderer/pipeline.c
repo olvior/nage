@@ -1,34 +1,18 @@
 #include "pipeline.h"
 #include "shaders.h"
+#include "materials.h"
 #include "../utils.h"
 
 #include <vulkan/vulkan.h>
-
-const int SHADER_STAGES = 2;
-
-typedef struct PipelineBuilder {
-    VkPipelineLayout layout;
-
-    VkPipelineShaderStageCreateInfo shader_stages[SHADER_STAGES];
-    VkPipelineInputAssemblyStateCreateInfo input_assembly;
-    VkPipelineRasterizationStateCreateInfo rasteriser;
-    VkPipelineColorBlendAttachmentState colour_blend_attachment;
-    VkPipelineMultisampleStateCreateInfo multisampling;
-    VkPipelineLayout pipeline_layout;
-    VkPipelineDepthStencilStateCreateInfo depth_stencil;
-    VkPipelineRenderingCreateInfo rendering_info;
-    VkFormat colour_attachment_format;
-} PipelineBuilder;
 
 
 void pipeline_initialise(Renderer* renderer)
 {
     descriptors_initialise(renderer);
-    create_pipeline_layout(renderer);
-    create_pipeline(renderer);
+    // create_pipeline_layout(renderer);
+    // create_pipeline(renderer);
 
-    // PushConstants a = {{100}};
-    // renderer->push_constants = a;
+    material_metallic_initialise_pipelines(&renderer->metalic_material, renderer);
 }
 
 void pipeline_cleanup(Renderer* renderer)
@@ -41,8 +25,8 @@ void pipeline_cleanup(Renderer* renderer)
         descriptor_allocator_growable_destroy_pools(&renderer->frame_descriptors[i], renderer->device);
         descriptor_allocator_growable_free_lists(&renderer->frame_descriptors[i]);
     }
-
-
+    descriptor_allocator_growable_destroy_pools(&renderer->global_descriptor_allocator, renderer->device);
+    descriptor_allocator_growable_free_lists(&renderer->global_descriptor_allocator);
 
     destroy_pool(renderer->descriptor_pool, renderer->device);
     vkDestroyDescriptorSetLayout(renderer->device, renderer->draw_image_desc_layout, NULL);
@@ -88,14 +72,24 @@ void descriptors_initialise(Renderer* renderer)
         DescriptorAllocatorGrowable* dag = &renderer->frame_descriptors[i];
         descriptor_allocator_growable_alloc_lists(dag);
         dag->ratios[0] = (VkDescriptorPoolSize) { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3 };
-		dag->ratios[1] = (VkDescriptorPoolSize) { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3 };
-		dag->ratios[2] = (VkDescriptorPoolSize) { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
-		dag->ratios[3] = (VkDescriptorPoolSize) { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4 };
+        dag->ratios[1] = (VkDescriptorPoolSize) { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3 };
+        dag->ratios[2] = (VkDescriptorPoolSize) { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
+        dag->ratios[3] = (VkDescriptorPoolSize) { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4 };
         dag->n_ratios = 4;
         dag->sets_per_pool = 1000;
 
         descriptor_allocator_growable_init(dag, renderer->device);
     }
+    DescriptorAllocatorGrowable* dag = &renderer->global_descriptor_allocator;
+    descriptor_allocator_growable_alloc_lists(dag);
+    dag->ratios[0] = (VkDescriptorPoolSize) { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3 };
+    dag->ratios[1] = (VkDescriptorPoolSize) { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3 };
+    dag->ratios[2] = (VkDescriptorPoolSize) { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
+    dag->ratios[3] = (VkDescriptorPoolSize) { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4 };
+    dag->n_ratios = 4;
+    dag->sets_per_pool = 100;
+
+    descriptor_allocator_growable_init(dag, renderer->device);
 
     // scene data
     VkDescriptorSetLayoutBinding scene_bindings[] = {
@@ -321,7 +315,7 @@ VkDescriptorBufferInfo descriptor_writer_get_buffer_info(VkBuffer buffer, size_t
     VkDescriptorBufferInfo info = {
         .buffer = buffer,
         .offset = offset,
-		.range = size,
+        .range = size,
     };
 
     return info;
@@ -363,6 +357,8 @@ VkWriteDescriptorSet descriptor_writer_get_write(int binding, VkDescriptorType t
 void descriptor_writer_update_set(VkDevice device, VkDescriptorSet set,
         VkWriteDescriptorSet* write_sets, int n_write_sets)
 {
+    if (set == NULL)
+        LOG_E("Destination set was null\n");
     for (int i = 0; i < n_write_sets; ++i)
         write_sets[i].dstSet = set;
 
@@ -404,7 +400,7 @@ void create_pipeline(Renderer* renderer)
     pb.shader_stages[1] = frag_shader;
     pipeline_builder_set_input_topology(&pb, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
     pipeline_builder_set_polygon_mode(&pb, VK_POLYGON_MODE_FILL);
-    pipeline_builder_set_cull_mode(&pb, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE);
+    pipeline_builder_set_cull_mode(&pb, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
     pipeline_builder_set_multisampling_none(&pb);
     pipeline_builder_disable_blending(&pb);
     // pipeline_builder_enable_blending(&pb, false);
@@ -497,10 +493,11 @@ VkPipeline pipeline_builder_build(PipelineBuilder* pb, VkDevice device)
     };
 
     VkPipeline pipeline;
-    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info, NULL, &pipeline)
-            != VK_SUCCESS)
+    VkResult e;
+    if ((e = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info, NULL,
+                    &pipeline) != VK_SUCCESS))
     {
-        LOG_E("Could not create vk pipeline");
+        LOG_E("Could not create vk pipeline, error code %d\n", e);
         return VK_NULL_HANDLE;
     }
 

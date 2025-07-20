@@ -13,7 +13,7 @@ Buffer buffer_create(VmaAllocator allocator, size_t alloc_size, VkBufferUsageFla
 
     VmaAllocationCreateInfo vma_alloc_info = {
         .usage = memory_usage,
-        .flags = VMA_ALLOCATION_CREATE_MAPPED_BIT,
+        .flags = 0,
     };
 
     Buffer buffer;
